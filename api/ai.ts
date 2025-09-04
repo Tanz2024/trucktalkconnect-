@@ -1,7 +1,7 @@
 // /api/ai.ts - TruckTalk Connect: Google Sheets Analysis API
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createHmac } from 'crypto';
-import OpenAI from 'openai';
+const OpenAI = require('openai');
 
 // ---------- TruckTalk Connect Data Model ----------
 export type Load = {
@@ -147,56 +147,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const temp = typeof temperature === 'number' && temperature >= 0 && temperature <= 1 ? temperature : 0;
 
   // Build comprehensive system prompt for TruckTalk Connect
-  const systemPrompt = `You are the TruckTalk Connect analysis engine. You analyze 2D trucking loads data from Google Sheets and return structured results.
+  const systemPrompt = `You are an expert data analyst for trucking logistics. Analyze spreadsheet data and return ONLY valid JSON.
 
-CRITICAL REQUIREMENTS:
-1. Never invent or fabricate data - unknowns must stay empty and be flagged as issues
-2. Normalize ALL datetimes to ISO 8601 UTC format (YYYY-MM-DDTHH:mm:ssZ)
-3. For naive datetimes (no timezone), assume environment.sheetTimezone and convert to UTC
-4. Return mapping as header→field (original header text → canonical field name)
-5. One row = one load (header row excluded from data)
-
-LOAD SCHEMA - Required fields (except driverPhone):
-- loadId: unique identifier
-- fromAddress: pickup location
-- fromAppointmentDateTimeUTC: pickup datetime (ISO 8601 UTC)
-- toAddress: delivery location  
-- toAppointmentDateTimeUTC: delivery datetime (ISO 8601 UTC)
-- status: load status/stage
-- driverName: driver full name
-- unitNumber: truck/vehicle identifier  
-- broker: broker/customer name
-- driverPhone: (optional) driver contact
-
-HEADER MAPPING - Use these synonyms for field detection:
-${Object.entries(KNOWN_SYNONYMS).map(([field, synonyms]) => 
-  `${field}: ${synonyms.join(', ')}`
-).join('\n')}
-
-VALIDATION CODES - Use these specific issue codes:
-- MISSING_COLUMN (error): required field has no mapped column
-- DUPLICATE_ID (error): loadId appears multiple times  
-- BAD_DATE_FORMAT (error): datetime unparseable or invalid
-- EMPTY_REQUIRED_CELL (error): required field is empty
-- NON_ISO_OUTPUT (warn): datetime converted from non-ISO format
-- INCONSISTENT_STATUS (warn): status values need normalization
-
-ISSUE FORMAT:
-{ code, severity, message, rows?, column?, suggestion? }
-- rows: 1-based sheet row numbers (header is row 1, data starts row 2)
-- suggestion: actionable fix recommendation
-
-OUTPUT FORMAT - Return ONLY this JSON structure:
+REQUIRED OUTPUT FORMAT (return only this JSON, no other text):
 {
   "ok": boolean,
-  "issues": Issue[],
-  "loads": Load[] | undefined,  // only present when ok===true
-  "mapping": Record<string,string>,
-  "meta": { "analyzedRows": number, "analyzedAt": string }
+  "issues": [{"code": string, "severity": "error"|"warn", "message": string, "suggestion": string}],
+  "loads": [{"loadId": string, "fromAddress": string, "toAddress": string, "status": string, "driverName": string, "unitNumber": string, "broker": string}],
+  "mapping": {"original_header": "field_name"},
+  "meta": {"analyzedRows": number, "analyzedAt": string}
 }
 
-If ANY errors exist, set ok=false and omit loads array.
-If no errors (only warnings ok), set ok=true and include loads array.`;
+RULES:
+- If ANY errors exist, set ok=false and omit "loads" array
+- Map headers to fields: loadId, fromAddress, toAddress, status, driverName, unitNumber, broker
+- Never invent data
+- Return ONLY the JSON object, no explanations
+
+INPUT: You'll receive headers and rows from a logistics spreadsheet.`;
 
   // Build user message with sheet data
   const userMessage = JSON.stringify({
@@ -234,43 +202,62 @@ If no errors (only warnings ok), set ok=true and include loads array.`;
     });
 
     const content = response.choices?.[0]?.message?.content || '';
+    console.log('🤖 Raw AI Response Length:', content.length);
+    console.log('🤖 Raw AI Response (first 500 chars):', content.substring(0, 500));
+    console.log('🤖 Raw AI Response (last 200 chars):', content.slice(-200));
+    
     const parsed = extractJson(content);
     
     if (!parsed || typeof parsed !== 'object') {
-      console.error('Invalid AI response:', content.substring(0, 300));
+      console.error('❌ JSON Extraction Failed');
+      console.error('Raw content:', content);
+      
+      // Try manual JSON fix for common issues
+      let fixedContent = content.trim();
+      
+      // If it starts with text before JSON, find the JSON
+      const jsonStart = fixedContent.indexOf('{');
+      if (jsonStart > 0) {
+        fixedContent = fixedContent.substring(jsonStart);
+      }
+      
+      // If it's truncated, try to close it properly
+      if (fixedContent.endsWith(',') || fixedContent.endsWith(',\n')) {
+        fixedContent = fixedContent.replace(/,\s*$/, '');
+      }
+      
+      // Try to close incomplete JSON
+      const openBraces = (fixedContent.match(/\{/g) || []).length;
+      const closeBraces = (fixedContent.match(/\}/g) || []).length;
+      for (let i = 0; i < openBraces - closeBraces; i++) {
+        fixedContent += '}';
+      }
+      
+      try {
+        const fixedParsed = JSON.parse(fixedContent);
+        console.log('✅ Fixed JSON successfully');
+        const fixedResult = sanitizeAndReturnResult(fixedParsed, rows.length);
+        return res.status(200).json(fixedResult);
+      } catch (fixError) {
+        console.error('❌ JSON fix failed:', fixError.message);
+      }
+      
       return res.status(502).json({ 
         error: 'AI analysis failed', 
         detail: 'Model did not return valid JSON format',
-        sample: content.substring(0, 200)
+        sample: content.substring(0, 500),
+        rawLength: content.length,
+        suggestions: [
+          'OpenAI response may be truncated',
+          'Model may need different prompt',
+          'Token limit may be insufficient'
+        ]
       });
     }
 
-    // Ensure result matches AnalysisResult structure exactly
-    const result: AnalysisResult = {
-      ok: Boolean(parsed.ok),
-      issues: Array.isArray(parsed.issues) ? parsed.issues : [],
-      loads: parsed.ok && Array.isArray(parsed.loads) ? parsed.loads : undefined,
-      mapping: parsed.mapping && typeof parsed.mapping === 'object' ? parsed.mapping : {},
-      meta: {
-        analyzedRows: rows.length,
-        analyzedAt: new Date().toISOString(),
-        ...(parsed.meta && typeof parsed.meta === 'object' ? parsed.meta : {})
-      }
-    };
-
-    // Validate loads structure if present
-    if (result.loads) {
-      result.loads = result.loads.filter((load: any) => 
-        load && typeof load === 'object' && 
-        typeof load.loadId === 'string' &&
-        typeof load.fromAddress === 'string' &&
-        typeof load.toAddress === 'string'
-      );
-    }
-
+    // Success path
+    const result = sanitizeAndReturnResult(parsed, rows.length);
     console.log(`✅ Analysis complete: ok=${result.ok}, issues=${result.issues.length}, loads=${result.loads?.length || 0}`);
-
-    res.setHeader('Content-Type', 'application/json');
     return res.status(200).json(result);
 
   } catch (err: any) {
@@ -281,4 +268,31 @@ If no errors (only warnings ok), set ok=true and include loads array.`;
       type: err?.type || 'unknown_error'
     });
   }
+}
+
+// Helper function to sanitize and return consistent result
+function sanitizeAndReturnResult(parsed: any, analyzedRows: number) {
+  const result: AnalysisResult = {
+    ok: Boolean(parsed.ok),
+    issues: Array.isArray(parsed.issues) ? parsed.issues : [],
+    loads: parsed.ok && Array.isArray(parsed.loads) ? parsed.loads : undefined,
+    mapping: parsed.mapping && typeof parsed.mapping === 'object' ? parsed.mapping : {},
+    meta: {
+      analyzedRows: analyzedRows,
+      analyzedAt: new Date().toISOString(),
+      ...(parsed.meta && typeof parsed.meta === 'object' ? parsed.meta : {})
+    }
+  };
+
+  // Validate loads structure if present
+  if (result.loads) {
+    result.loads = result.loads.filter((load: any) => 
+      load && typeof load === 'object' && 
+      typeof load.loadId === 'string' &&
+      typeof load.fromAddress === 'string' &&
+      typeof load.toAddress === 'string'
+    );
+  }
+
+  return result;
 }

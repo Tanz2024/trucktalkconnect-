@@ -1,7 +1,74 @@
-// /api/ai.ts (Vercel serverless) – accepts Sheets snapshot payload and returns strict JSON
+// /api/ai.ts - TruckTalk Connect: Google Sheets Analysis API (hardened)
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createHmac } from 'crypto';
 import OpenAI from 'openai';
+
+// ---------- Types ----------
+export type Load = {
+  loadId: string;
+  fromAddress: string;
+  fromAppointmentDateTimeUTC: string;
+  toAddress: string;
+  toAppointmentDateTimeUTC: string;
+  status: string;
+  driverName: string;
+  driverPhone?: string;
+  unitNumber: string;
+  broker: string;
+};
+
+export type Issue = {
+  code: string;
+  severity: 'error' | 'warn';
+  message: string;
+  rows?: number[];
+  column?: string;
+  suggestion?: string;
+};
+
+export type AnalysisResult = {
+  ok: boolean;
+  issues: Issue[];
+  loads?: Load[];
+  mapping: Record<string, string>; // header -> field
+  meta: {
+    analyzedRows: number;
+    analyzedAt: string;
+    engine?: string;
+    model?: string;
+    headerCount?: number;
+    summary?: string;
+    assumptions?: string[];
+    [key: string]: any;
+  };
+};
+
+// ---------- Config ----------
+const CANONICAL_FIELDS = [
+  'loadId',
+  'fromAddress',
+  'fromAppointmentDateTimeUTC',
+  'toAddress',
+  'toAppointmentDateTimeUTC',
+  'status',
+  'driverName',
+  'driverPhone',
+  'unitNumber',
+  'broker',
+];
+
+const KNOWN_SYNONYMS: Record<string, string[]> = {
+  loadId: ['Load ID', 'Ref', 'VRID', 'Reference', 'Ref #', 'Load #', 'Load Number'],
+  fromAddress: ['From', 'PU', 'Pickup', 'Origin', 'Pickup Address', 'From Address', 'PU Address'],
+  fromAppointmentDateTimeUTC: ['PU Time', 'Pickup Appt', 'Pickup Date/Time', 'Pickup Date', 'PU Date', 'From Date'],
+  toAddress: ['To', 'Drop', 'Delivery', 'Destination', 'Delivery Address', 'To Address', 'Drop Address'],
+  toAppointmentDateTimeUTC: ['DEL Time', 'Delivery Appt', 'Delivery Date/Time', 'Delivery Date', 'DEL Date', 'To Date'],
+  status: ['Status', 'Load Status', 'Stage', 'State'],
+  driverName: ['Driver', 'Driver Name', 'Driver Full Name'],
+  driverPhone: ['Phone', 'Driver Phone', 'Contact', 'Driver Contact', 'Mobile'],
+  unitNumber: ['Unit', 'Truck', 'Truck #', 'Tractor', 'Unit Number', 'Truck Number', 'Vehicle'],
+  broker: ['Broker', 'Customer', 'Shipper', 'Client'],
+};
 
 const ALLOWED_MODELS = new Set([
   'gpt-4o-mini',
@@ -9,26 +76,79 @@ const ALLOWED_MODELS = new Set([
   'gpt-4o-mini-2024-07-18',
 ]);
 
-function verifyHmac(secret: string, raw: string, sig: string | undefined) {
+// ---------- Helpers ----------
+function verifyHmac(secret: string, raw: string, sig: string | undefined): boolean {
   if (!sig) return false;
   const h = createHmac('sha256', secret).update(raw).digest('hex');
   return sig === `sha256=${h}`;
 }
 
-function extractJson(txt: string): any | null {
-  if (!txt) return null;
-  // fenced
-  const m = txt.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  if (m?.[1]) { try { return JSON.parse(m[1]); } catch {} }
-  // object
-  const s1 = txt.indexOf('{'), e1 = txt.lastIndexOf('}');
-  if (s1 !== -1 && e1 > s1) { try { return JSON.parse(txt.slice(s1, e1 + 1)); } catch {} }
-  // array
-  const s2 = txt.indexOf('['), e2 = txt.lastIndexOf(']');
-  if (s2 !== -1 && e2 > s2) { try { return JSON.parse(txt.slice(s2, e2 + 1)); } catch {} }
-  return null;
+function looksLikeFieldToHeader(mapping: Record<string, string>, headers: string[]) {
+  const keys = Object.keys(mapping);
+  if (!keys.length) return false;
+  const keyAreFields = keys.every(k => CANONICAL_FIELDS.includes(k));
+  const valuesAreHeaders = Object.values(mapping).every(v => headers.includes(v));
+  return keyAreFields && valuesAreHeaders;
 }
 
+function flipMapping(fieldToHeader: Record<string, string>) {
+  const out: Record<string, string> = {};
+  for (const [field, header] of Object.entries(fieldToHeader)) {
+    out[header] = field;
+  }
+  return out;
+}
+
+function normalizeIssue(i: any): Issue | null {
+  if (!i || typeof i !== 'object') return null;
+  const code = typeof i.code === 'string' ? i.code : 'ISSUE';
+  let severity: 'error' | 'warn' =
+    i.severity === 'error' || i.severity === 'warn' ? i.severity : 'warn';
+  const message = typeof i.message === 'string' ? i.message : String(i.message || code);
+  const rows = Array.isArray(i.rows) ? i.rows.filter((n: any) => Number.isInteger(n)) : undefined;
+  const column = typeof i.column === 'string' ? i.column : undefined;
+  const suggestion = typeof i.suggestion === 'string' ? i.suggestion : undefined;
+
+  // Policy guard: naive datetime => NON_ISO_INPUT (warn), not BAD_DATE_FORMAT
+  if (/non[-\s]?iso|naive|no time\s?zone/i.test(message) && /BAD_DATE_FORMAT/i.test(code)) {
+    return {
+      code: 'NON_ISO_INPUT',
+      severity: 'warn',
+      message,
+      rows,
+      column,
+      suggestion: suggestion || 'Prefer ISO 8601 with explicit timezone.',
+    };
+  }
+  return { code, severity, message, rows, column, suggestion };
+}
+
+function coerceAnalysisResult(parsed: any, headers: string[], rowsCount: number): AnalysisResult {
+  const ok = !!parsed?.ok;
+  let mapping: Record<string, string> = parsed?.mapping && typeof parsed.mapping === 'object' ? parsed.mapping : {};
+
+  // Auto-flip mapping if it came back field->header
+  if (looksLikeFieldToHeader(mapping, headers)) {
+    mapping = flipMapping(mapping);
+  }
+
+  const issues: Issue[] = Array.isArray(parsed?.issues)
+    ? parsed.issues.map(normalizeIssue).filter(Boolean) as Issue[]
+    : [];
+
+  const meta = {
+    analyzedRows: rowsCount,
+    analyzedAt: new Date().toISOString(),
+    ...(parsed?.meta && typeof parsed.meta === 'object' ? parsed.meta : {}),
+  };
+
+  const loads: Load[] | undefined =
+    ok && Array.isArray(parsed?.loads) ? parsed.loads : undefined;
+
+  return { ok, issues, loads, mapping, meta };
+}
+
+// ---------- Handler ----------
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -41,89 +161,135 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
 
-  // Raw body for HMAC (Vercel already parsed req.body; rebuild raw)
-  const rawBody = JSON.stringify(req.body || {});
+  // ⚠️ HMAC note:
+  // In serverless, req.body is already parsed; re-stringifying can change key order.
+  // Unless the client signs the exact raw string (and you can access it here), HMAC may fail.
+  // Keep optional or disable until you sign a canonical string on both sides.
   const hmacSecret = process.env.HMAC_SECRET;
   if (hmacSecret) {
+    const rawBody = JSON.stringify(req.body || {});
     const sig = req.headers['x-signature'] as string | undefined;
-    if (!sig) return res.status(401).json({ error: 'Missing signature' });
-    if (!verifyHmac(hmacSecret, rawBody, sig)) return res.status(401).json({ error: 'Invalid signature' });
+    if (!sig || !verifyHmac(hmacSecret, rawBody, sig)) {
+      return res.status(401).json({ error: 'Invalid or missing signature' });
+    }
   }
 
-  // Snapshot payload from Apps Script
   const {
-    // app payload
-    headers,
-    rows,
-    knownSynonyms,
-    headerOverrides,
-    environment,
-    expectations,
-    returnContract,
-    note,
-    __system,
-    // (optional) override model/temperature
-    model,
-    temperature,
+    headers = [],
+    rows = [],
+    knownSynonyms = KNOWN_SYNONYMS,
+    headerOverrides = {},
+    environment = {},
+    expectations = {},
+    returnContract = 'AnalysisResult',
+    note = '',
+    model = 'gpt-4o-mini',
+    temperature = 0,
+    // NEW: allow caller to specify the first data row (Sheets usually 2)
+    rowBase = 2,
   } = req.body || {};
 
-  // Build the system prompt
+  if (!Array.isArray(headers) || !Array.isArray(rows)) {
+    return res.status(400).json({ error: 'Invalid payload: headers and rows must be arrays' });
+  }
+  if (!headers.length) {
+    return res.status(400).json({ error: 'No headers provided' });
+  }
+
+  const mdl = ALLOWED_MODELS.has(model) ? model : 'gpt-4o-mini';
+  const temp = typeof temperature === 'number' && temperature >= 0 && temperature <= 1 ? temperature : 0;
+
+  // ————— Prompts —————
   const systemPrompt =
-    __system ||
-    [
-      'You convert a 2D table of logistics loads into a typed JSON array and a list of validation issues.',
-      'Never invent data. Unknowns stay empty and are flagged.',
-      'Normalize all datetimes to ISO 8601 UTC.',
-      'If a datetime is naive (no zone/offset), ASSUME sheetTimezone from environment and convert to UTC.',
-      'Return ONLY JSON strictly as { ok, issues[], loads[], mapping, meta }.',
-    ].join(' ');
+`You are a logistics data analyst for TruckTalk Connect. You convert a 2D table of trucking loads into a typed JSON array and report validation issues.
 
-  // Extra guardrail so naive times become warnings, not errors
-  const guardrails =
-    'If a datetime lacks timezone/offset, assume environment.sheetTimezone and convert to UTC. ' +
-    'Do NOT mark BAD_DATE_FORMAT only because tz is missing; instead add NON_ISO_INPUT warn and an assumption.';
+HARD RULES:
+- Never invent or guess data; unknowns stay empty and are flagged.
+- Normalize ALL datetimes to strict ISO 8601 UTC: YYYY-MM-DDTHH:mm:ssZ.
+- If a datetime has an explicit offset or 'Z', parse and convert to UTC.
+- If a datetime includes a timezone word/abbr (e.g., MST), parse and convert to UTC and add a WARN issue (NON_ISO_INPUT) about normalization.
+- If a datetime is NAIVE (no zone/offset), ASSUME environment.sheetTimezone and convert to UTC, and add a WARN issue (NON_ISO_INPUT) about the assumption.
+- Only when a datetime is truly UNPARSEABLE, use BAD_DATE_FORMAT (ERROR).
+- One row = one load.
 
-  const userMsg = JSON.stringify({
+MAPPING:
+- You MUST return mapping as "header -> field" (original header text as key; canonical field as value).
+- Canonical fields: ${CANONICAL_FIELDS.join(', ')}.
+
+ISSUES:
+Return issues as objects: { code, severity, message, rows?, column?, suggestion? }.
+Use these codes when applicable: MISSING_COLUMN, EMPTY_REQUIRED, DUPLICATE_ID, BAD_DATE_FORMAT, NON_ISO_INPUT, STATUS_VOCAB, UNKNOWN_HEADER, EXTRA_DATA, NORMALIZED_VALUE.
+
+ROW NUMBERS:
+- rows[] must be 1-based SHEET row numbers (header row is 1). The first data row index is rowBase.
+
+OUTPUT:
+Return ONLY JSON exactly as { ok, issues[], loads[], mapping, meta }.
+- loads is present ONLY if ok === true.
+- meta must include analyzedRows, analyzedAt, and may include summary and assumptions.`;
+
+  const userObj = {
     headers,
-    rows,
+    rows: rows.slice(0, 200), // cap for safety
     knownSynonyms,
     headerOverrides,
-    environment,
-    expectations,
+    environment: {
+      sheetTimezone: environment.sheetTimezone || 'UTC',
+      ...environment,
+    },
+    expectations: {
+      oneRowPerLoad: true,
+      hasHeaderRow: true,
+      ...expectations,
+    },
+    rowBase, // NEW: tell the model where row numbering starts for data
     returnContract,
-    note,
-    guardrails,
-  });
-
-  const client = new OpenAI({ apiKey });
+    note: note || 'Analyze this trucking loads spreadsheet data',
+  };
 
   try {
-    const mdl = ALLOWED_MODELS.has(model) ? model : 'gpt-4o-mini';
-    const temp = typeof temperature === 'number' ? temperature : 0;
+    const client = new OpenAI({ apiKey });
 
     const chat = await client.chat.completions.create({
       model: mdl,
       temperature: temp,
       messages: [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: userMsg },
+        { role: 'user', content: JSON.stringify(userObj) },
       ],
+      // Force pure JSON output
+      response_format: { type: 'json_object' },
+      max_tokens: 4000,
     });
 
     const content = chat.choices?.[0]?.message?.content || '';
-    const parsed = extractJson(content);
-    if (!parsed || typeof parsed !== 'object') {
-      return res.status(502).json({ error: 'Model did not return JSON', content });
+    let parsed: any = {};
+    try {
+      parsed = JSON.parse(content);
+    } catch {
+      return res.status(502).json({
+        error: 'AI analysis failed',
+        detail: 'Model did not return valid JSON',
+        content: content.slice(0, 500),
+      });
     }
 
-    // add engine tag for your UI
-    parsed.meta = parsed.meta || {};
-    parsed.meta.engine = 'proxy';
+    // Coerce to our contract & apply guard rails
+    const result: AnalysisResult = coerceAnalysisResult(parsed, headers, rows.length);
+
+    // Add processing metadata
+    result.meta.engine = 'openai-proxy';
+    result.meta.model = mdl;
+    result.meta.headerCount = headers.length;
 
     res.setHeader('Content-Type', 'application/json');
-    return res.status(200).json(parsed);
+    return res.status(200).json(result);
   } catch (err: any) {
-    console.error('AI endpoint error:', err?.message || err);
-    return res.status(500).json({ error: 'AI endpoint failure', detail: String(err?.message || err) });
+    console.error('OpenAI API error:', err?.message || err);
+    return res.status(500).json({
+      error: 'Analysis service failure',
+      detail: err?.message || 'Unknown error',
+      type: err?.type || 'unknown',
+    });
   }
 }

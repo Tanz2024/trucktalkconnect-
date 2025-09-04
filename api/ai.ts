@@ -99,51 +99,88 @@ function flipMapping(fieldToHeader: Record<string, string>) {
   return out;
 }
 
+function normalizeAssumptions(x: any): string[] {
+  if (!x) return [];
+  if (Array.isArray(x)) return x.map(s => String(s));
+  return [String(x)];
+}
+
+// Force-severity table
+const ERROR_CODES = new Set([
+  'MISSING_COLUMN',
+  'EMPTY_REQUIRED',
+  'EMPTY_REQUIRED_CELL',
+  'DUPLICATE_ID',
+  'BAD_DATE_FORMAT',
+]);
+
 function normalizeIssue(i: any): Issue | null {
   if (!i || typeof i !== 'object') return null;
-  const code = typeof i.code === 'string' ? i.code : 'ISSUE';
-  let severity: 'error' | 'warn' =
-    i.severity === 'error' || i.severity === 'warn' ? i.severity : 'warn';
-  const message = typeof i.message === 'string' ? i.message : String(i.message || code);
-  const rows = Array.isArray(i.rows) ? i.rows.filter((n: any) => Number.isInteger(n)) : undefined;
+
+  const rawCode = (typeof i.code === 'string' ? i.code : 'ISSUE').toUpperCase();
+  let code = rawCode;
+
+  // Coerce rows -> number[]
+  const rows = Array.isArray(i.rows)
+    ? i.rows.map((n: any) => Number(n)).filter((n: number) => Number.isFinite(n))
+    : undefined;
+
   const column = typeof i.column === 'string' ? i.column : undefined;
+  const message = typeof i.message === 'string' ? i.message : String(i.message || rawCode);
   const suggestion = typeof i.suggestion === 'string' ? i.suggestion : undefined;
 
-  // Policy guard: naive datetime => NON_ISO_INPUT (warn), not BAD_DATE_FORMAT
-  if (/non[-\s]?iso|naive|no time\s?zone/i.test(message) && /BAD_DATE_FORMAT/i.test(code)) {
+  // If the message indicates "naive/non-ISO" but the code is BAD_DATE_FORMAT, downgrade to NON_ISO_INPUT (warn)
+  const looksNaive = /naive|non[-\s]?iso|no\s*time\s*zone|timezone\s*missing/i.test(message);
+  if (rawCode === 'BAD_DATE_FORMAT' && looksNaive) {
     return {
       code: 'NON_ISO_INPUT',
       severity: 'warn',
       message,
       rows,
       column,
-      suggestion: suggestion || 'Prefer ISO 8601 with explicit timezone.',
+      suggestion: suggestion || 'Prefer ISO 8601 with explicit timezone or offset.',
     };
   }
+
+  // Severity normalization
+  let severity: 'error' | 'warn';
+  if (ERROR_CODES.has(code)) {
+    severity = 'error';
+  } else {
+    severity = (i.severity === 'error' || i.severity === 'warn') ? i.severity : 'warn';
+  }
+
   return { code, severity, message, rows, column, suggestion };
 }
 
 function coerceAnalysisResult(parsed: any, headers: string[], rowsCount: number): AnalysisResult {
   const ok = !!parsed?.ok;
-  let mapping: Record<string, string> = parsed?.mapping && typeof parsed.mapping === 'object' ? parsed.mapping : {};
 
-  // Auto-flip mapping if it came back field->header
+  // mapping: ensure header -> field
+  let mapping: Record<string, string> =
+    parsed?.mapping && typeof parsed.mapping === 'object' ? parsed.mapping : {};
+
   if (looksLikeFieldToHeader(mapping, headers)) {
     mapping = flipMapping(mapping);
   }
 
+  // issues
   const issues: Issue[] = Array.isArray(parsed?.issues)
-    ? parsed.issues.map(normalizeIssue).filter(Boolean) as Issue[]
+    ? (parsed.issues.map(normalizeIssue).filter(Boolean) as Issue[])
     : [];
 
+  // meta
+  const metaObj = (parsed?.meta && typeof parsed.meta === 'object') ? parsed.meta : {};
   const meta = {
     analyzedRows: rowsCount,
     analyzedAt: new Date().toISOString(),
-    ...(parsed?.meta && typeof parsed.meta === 'object' ? parsed.meta : {}),
+    summary: metaObj.summary ? String(metaObj.summary) : '',
+    assumptions: normalizeAssumptions(metaObj.assumptions),
+    ...metaObj,
   };
 
-  const loads: Load[] | undefined =
-    ok && Array.isArray(parsed?.loads) ? parsed.loads : undefined;
+  // loads only when ok===true
+  const loads: Load[] | undefined = ok && Array.isArray(parsed?.loads) ? parsed.loads : undefined;
 
   return { ok, issues, loads, mapping, meta };
 }
@@ -161,10 +198,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
 
-  // ⚠️ HMAC note:
-  // In serverless, req.body is already parsed; re-stringifying can change key order.
-  // Unless the client signs the exact raw string (and you can access it here), HMAC may fail.
-  // Keep optional or disable until you sign a canonical string on both sides.
+  // Optional HMAC (be careful with raw vs parsed body)
   const hmacSecret = process.env.HMAC_SECRET;
   if (hmacSecret) {
     const rawBody = JSON.stringify(req.body || {});
@@ -185,7 +219,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     note = '',
     model = 'gpt-4o-mini',
     temperature = 0,
-    // NEW: allow caller to specify the first data row (Sheets usually 2)
     rowBase = 2,
   } = req.body || {};
 
@@ -213,7 +246,7 @@ HARD RULES:
 - One row = one load.
 
 MAPPING:
-- You MUST return mapping as "header -> field" (original header text as key; canonical field as value).
+- Return mapping as "header -> field" (original header text as key; canonical field as value).
 - Canonical fields: ${CANONICAL_FIELDS.join(', ')}.
 
 ISSUES:
@@ -242,7 +275,7 @@ Return ONLY JSON exactly as { ok, issues[], loads[], mapping, meta }.
       hasHeaderRow: true,
       ...expectations,
     },
-    rowBase, // NEW: tell the model where row numbering starts for data
+    rowBase, // first data row index for the sheet (usually 2)
     returnContract,
     note: note || 'Analyze this trucking loads spreadsheet data',
   };
@@ -257,8 +290,7 @@ Return ONLY JSON exactly as { ok, issues[], loads[], mapping, meta }.
         { role: 'system', content: systemPrompt },
         { role: 'user', content: JSON.stringify(userObj) },
       ],
-      // Force pure JSON output
-      response_format: { type: 'json_object' },
+      response_format: { type: 'json_object' }, // force pure JSON
       max_tokens: 4000,
     });
 
@@ -274,10 +306,9 @@ Return ONLY JSON exactly as { ok, issues[], loads[], mapping, meta }.
       });
     }
 
-    // Coerce to our contract & apply guard rails
     const result: AnalysisResult = coerceAnalysisResult(parsed, headers, rows.length);
 
-    // Add processing metadata
+    // metadata
     result.meta.engine = 'openai-proxy';
     result.meta.model = mdl;
     result.meta.headerCount = headers.length;

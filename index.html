@@ -1,12 +1,61 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>OpenAI Proxy</title>
+    <title>API Gateway</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }
+        .status { color: #28a745; }
+        code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; }
+        .test-btn { background: #007bff; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; margin-top: 10px; }
+        .result { margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 4px; display: none; }
+    </style>
 </head>
 <body>
-    <h1>OpenAI Proxy API</h1>
-    <p>This is a serverless OpenAI proxy.</p>
-    <p><strong>API Endpoint:</strong> <code>POST /api/ai</code></p>
-    <p><strong>Status:</strong> ✅ Running</p>
+    <h2>AI Gateway</h2>
+    <p>Simple proxy service for chat completions.</p>
+    
+    <div>
+        <strong>Endpoint:</strong> <code>/api/ai</code><br>
+        <strong>Method:</strong> POST<br>
+        <strong>Status:</strong> <span class="status">● Online</span>
+    </div>
+
+    <button class="test-btn" onclick="testAPI()">Test Connection</button>
+    <div id="result" class="result"></div>
+
+    <script>
+        async function testAPI() {
+            const btn = document.querySelector('.test-btn');
+            const result = document.getElementById('result');
+            
+            btn.textContent = 'Testing...';
+            result.style.display = 'none';
+            
+            try {
+                const response = await fetch('/api/ai', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        model: 'gpt-4o-mini',
+                        messages: [{ role: 'user', content: 'ping' }]
+                    })
+                });
+                
+                if (response.ok) {
+                    result.innerHTML = '<strong>✓ Connection successful</strong><br>Service is working normally.';
+                    result.style.backgroundColor = '#d4edda';
+                } else {
+                    result.innerHTML = '<strong>✗ Connection failed</strong><br>Status: ' + response.status;
+                    result.style.backgroundColor = '#f8d7da';
+                }
+            } catch (e) {
+                result.innerHTML = '<strong>✗ Network error</strong><br>' + e.message;
+                result.style.backgroundColor = '#f8d7da';
+            }
+            
+            result.style.display = 'block';
+            btn.textContent = 'Test Connection';
+        }
+    </script>
 </body>
 </html>

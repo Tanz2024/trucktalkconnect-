@@ -10,6 +10,10 @@
     "deploy": "vercel --prod"
   },
   "devDependencies": {
-    "@types/node": "^18.0.0"
+    "@types/node": "^18.0.0",
+    "@vercel/node": "^5.3.20"
+  },
+  "dependencies": {
+    "openai": "^5.19.1"
   }
 }

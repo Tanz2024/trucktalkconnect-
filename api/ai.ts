@@ -1,4 +1,4 @@
-// /api/ai.ts — TruckTalk Connect: Google Sheets Analysis API (stable)
+// /api/ai.ts — TruckTalk Connect: Google Sheets Analysis API (stable, hardened)
 // Vercel Serverless (Node runtime)
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
@@ -12,9 +12,9 @@ export const config = { maxDuration: 30 };
 export type Load = {
   loadId: string;
   fromAddress: string;
-  fromAppointmentDateTimeUTC: string; // ISO 8601
+  fromAppointmentDateTimeUTC: string; // ISO 8601 (UTC)
   toAddress: string;
-  toAppointmentDateTimeUTC: string;   // ISO 8601
+  toAppointmentDateTimeUTC: string;   // ISO 8601 (UTC)
   status: string;
   driverName: string;
   driverPhone?: string;
@@ -34,7 +34,7 @@ export type Issue = {
   severity: 'error' | 'warn';
   message: string;
   rows?: number[];   // 1-based
-  column?: string;   // header name
+  column?: string;   // header name or canonical field
   suggestion?: string;
 };
 
@@ -43,7 +43,13 @@ export type AnalysisResult = {
   issues: Issue[];
   loads?: Load[]; // only present when ok===true
   mapping: Record<string, string>; // original header -> canonical field
-  meta: { analyzedRows: number; analyzedAt: string; [k: string]: any };
+  meta: {
+    analyzedRows: number;
+    analyzedAt: string;
+    assumptions?: string[];
+    normalizationNotes?: string[];
+    [k: string]: any;
+  };
 };
 
 // ---------- Constants ----------
@@ -70,13 +76,16 @@ const REQUIRED_FIELDS = [
   'driverName',
   'unitNumber',
   'broker',
-];
+] as const;
 
 const ALLOWED_MODELS = new Set([
   'gpt-4o-mini',
   'gpt-4o-mini-latest',
   'gpt-4o-mini-2024-07-18',
 ]);
+
+const ROW_LIMIT = 200;
+const ISO_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
 
 // ---------- Utils ----------
 function setCors(res: VercelResponse) {
@@ -101,6 +110,37 @@ function extractJson(txt: string): any | null {
   return null;
 }
 
+// Safer extraction for OpenAI Responses API shapes
+function pickOutputText(resp: any): string {
+  if (!resp) return '';
+  if (typeof resp.output_text === 'string') return resp.output_text;
+
+  // Common fallbacks
+  const tryPaths = [
+    () => resp.output?.[0]?.content?.[0]?.text,
+    () => resp.output?.[0]?.content?.find?.((c: any) => typeof c?.text === 'string')?.text,
+    () => resp.choices?.[0]?.message?.content,
+    () => (Array.isArray(resp.output) ? resp.output.map((o: any) => o?.content?.map?.((c: any) => c?.text).filter(Boolean).join('\n')).filter(Boolean).join('\n') : ''),
+  ];
+
+  for (const f of tryPaths) {
+    try {
+      const val = f();
+      if (typeof val === 'string' && val.trim()) return val;
+    } catch {}
+  }
+
+  // Last resort: stringify
+  return typeof resp === 'string' ? resp : JSON.stringify(resp);
+}
+
+// Placeholder/fabrication detector for required fields
+function looksLikePlaceholder(v: unknown): boolean {
+  if (typeof v !== 'string') return false;
+  const t = v.trim();
+  return /^(unknown|n\/a|na|none|null|no data|not provided)$/i.test(t);
+}
+
 const SYSTEM_PROMPT = (() => {
   const synonymsText = Object.entries(KNOWN_SYNONYMS)
     .map(([field, synonyms]) => `${field}: ${synonyms.join(', ')}`)
@@ -109,7 +149,7 @@ const SYSTEM_PROMPT = (() => {
   return `You are the TruckTalk Connect analysis engine. You analyze 2D trucking loads data from Google Sheets and return structured results.
 
 CRITICAL REQUIREMENTS:
-1. Never invent or fabricate data — unknowns must stay empty and be flagged as issues.
+1. Never invent or fabricate data — unknowns must stay empty ("") and be flagged as issues.
 2. Normalize ALL datetimes to ISO 8601 UTC format (YYYY-MM-DDTHH:mm:ssZ).
 3. For naive datetimes (no timezone), assume environment.sheetTimezone and convert to UTC.
 4. Return mapping as header→field (original header text → canonical field name).
@@ -149,7 +189,12 @@ OUTPUT FORMAT — Return ONLY this JSON structure:
   "issues": Issue[],
   "loads": Load[] | undefined,
   "mapping": Record<string,string>,
-  "meta": { "analyzedRows": number, "analyzedAt": string }
+  "meta": {
+    "analyzedRows": number,
+    "analyzedAt": string,
+    "assumptions": string[],         // e.g., timezone defaults, ambiguous header decisions
+    "normalizationNotes": string[]   // e.g., "Converted MST→UTC", "Trimmed whitespace"
+  }
 }
 
 If ANY errors exist, set ok=false and omit loads array.
@@ -165,7 +210,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   // Health check
   if (req.method === 'GET') {
-    return res.status(200).json({ ok: true, service: 'TruckTalk AI', runtime, version: '2025-09-05' });
+    return res.status(200).json({ ok: true, service: 'TruckTalk AI', runtime, version: '2025-09-06' });
   }
 
   if (req.method !== 'POST') {
@@ -180,11 +225,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ok: true,
       service: 'TruckTalk AI',
       mode: 'probe',
-      note: 'POST with empty body accepted for connection test.'
+      note: 'POST with empty body accepted for connection test.',
     });
   }
 
   // Optional HMAC (only for real requests)
+  // NOTE: Contract is "sign EXACT JSON.stringify(payload) used in this request body".
   const rawBody = JSON.stringify(req.body || {});
   const hmacSecret = process.env.HMAC_SECRET;
   if (hmacSecret) {
@@ -192,7 +238,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!sig || !verifyHmac(hmacSecret, rawBody, sig)) {
       return res.status(401).json({
         error: 'Invalid or missing signature',
-        hint: 'When HMAC_SECRET is set, sign raw JSON body and send header X-Signature: sha256=<digest>',
+        hint:
+          'Sign EXACT JSON string of the request body: sha256=<hex>(JSON.stringify(payload)) and send header X-Signature: sha256=<digest>.',
       });
     }
   }
@@ -227,6 +274,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       meta: {
         analyzedRows: Array.isArray(rows) ? rows.length : 0,
         analyzedAt: new Date().toISOString(),
+        assumptions: [],
+        normalizationNotes: [],
         mode: 'dry-run',
       },
     };
@@ -254,7 +303,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const temp = typeof temperature === 'number' && temperature >= 0 && temperature <= 1 ? temperature : 0;
 
   // Limit rows to protect tokens
-  const ROW_LIMIT = 200;
   const limitedRows = rows.slice(0, ROW_LIMIT);
 
   // Build user payload for the model
@@ -294,7 +342,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       max_output_tokens: 2000,
     });
 
-    const content = (response as any).output_text ?? '';
+    const content = pickOutputText(response);
     const parsed = extractJson(content);
 
     if (!parsed || typeof parsed !== 'object') {
@@ -306,7 +354,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // Shape final result
+    // Shape base result
     const result: AnalysisResult = {
       ok: Boolean(parsed.ok),
       issues: Array.isArray(parsed.issues) ? parsed.issues : [],
@@ -319,7 +367,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       },
     };
 
-    // Basic structural guardrails on loads
+    // Ensure arrays exist in meta
+    if (!Array.isArray(result.meta.assumptions)) result.meta.assumptions = [];
+    if (!Array.isArray(result.meta.normalizationNotes)) result.meta.normalizationNotes = [];
+
+    // Structural guardrails on loads (basic shape)
     if (result.loads) {
       result.loads = result.loads.filter(
         (load: any) =>
@@ -329,6 +381,74 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           typeof load.fromAddress === 'string' &&
           typeof load.toAddress === 'string',
       );
+    }
+
+    // ---- Server-side guardrails ----
+
+    // A) Recompute ok based on issues; strip loads if any error exists
+    const hasErrors = Array.isArray(result.issues) && result.issues.some(i => i?.severity === 'error');
+    if (hasErrors) {
+      result.ok = false;
+      delete result.loads;
+    } else {
+      result.ok = true;
+    }
+
+    // B) Ensure ISO-8601 UTC for the two datetime fields; warn if not
+    if (result.loads && Array.isArray(result.loads)) {
+      result.loads.forEach((load, idx) => {
+        (['fromAppointmentDateTimeUTC','toAppointmentDateTimeUTC'] as const).forEach(col => {
+          const v = (load as any)[col];
+          if (typeof v === 'string' && v) {
+            if (!ISO_UTC.test(v)) {
+              result.issues.push({
+                code: 'NON_ISO_OUTPUT',
+                severity: 'warn',
+                message: `Non-ISO datetime returned in ${col} (row ${idx + 2})`,
+                rows: [idx + 2],
+                column: col,
+                suggestion: 'Return YYYY-MM-DDTHH:mm:ssZ (UTC).',
+              });
+            }
+          } else if (v !== '') {
+            // If not string and not empty string, it's malformed
+            result.issues.push({
+              code: 'BAD_DATE_FORMAT',
+              severity: 'error',
+              message: `Invalid datetime type in ${col} (row ${idx + 2})`,
+              rows: [idx + 2],
+              column: col,
+              suggestion: 'Return a string in ISO-8601 UTC (YYYY-MM-DDTHH:mm:ssZ) or empty string if unknown.',
+            });
+          }
+        });
+      });
+    }
+
+    // C/D) Flag suspicious placeholders for required fields as EMPTY_REQUIRED_CELL
+    if (result.loads && Array.isArray(result.loads)) {
+      result.loads.forEach((load, idx) => {
+        (REQUIRED_FIELDS as readonly string[]).forEach((f) => {
+          const v = (load as any)[f];
+          if (v === '' || v === undefined || v === null || looksLikePlaceholder(v)) {
+            result.issues.push({
+              code: 'EMPTY_REQUIRED_CELL',
+              severity: 'error',
+              message: `Required field "${f}" is empty or placeholder (row ${idx + 2})`,
+              rows: [idx + 2],
+              column: f,
+              suggestion: 'Provide a real value or leave "" and correct in the source sheet.',
+            });
+          }
+        });
+      });
+    }
+
+    // If guardrails created errors after the model's output, recompute ok & loads again
+    const nowHasErrors = result.issues.some(i => i.severity === 'error');
+    if (nowHasErrors) {
+      result.ok = false;
+      delete result.loads;
     }
 
     console.log(`✅ Analysis complete: ok=${result.ok}, issues=${result.issues.length}, loads=${result.loads?.length || 0}`);

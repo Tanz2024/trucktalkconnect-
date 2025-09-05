@@ -1,9 +1,14 @@
-// /api/ai.ts - TruckTalk Connect: Google Sheets Analysis API
+// /api/ai.ts - TruckTalk Connect: Google Sheets Analysis API (fixed)
+// Runtime: Vercel Serverless (Node.js)
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createHmac } from 'crypto';
 import OpenAI from 'openai';
 
-// ---------- TruckTalk Connect Data Model ----------
+// Allow longer executions if needed (Vercel)
+export const config = { maxDuration: 30 };
+
+// ---------- Data Model ----------
 export type Load = {
   loadId: string;
   fromAddress: string;
@@ -12,26 +17,26 @@ export type Load = {
   toAppointmentDateTimeUTC: string;   // ISO 8601
   status: string;
   driverName: string;
-  driverPhone?: string;                // optional
-  unitNumber: string;                  // vehicle/truck id
+  driverPhone?: string;
+  unitNumber: string;
   broker: string;
 };
 
 export type Issue = {
-  code: string;              // e.g., MISSING_COLUMN, BAD_DATE_FORMAT, DUPLICATE_ID
-  severity: 'error'|'warn';
-  message: string;           // user‑friendly
-  rows?: number[];           // affected rows (1‑based)
-  column?: string;           // header name
-  suggestion?: string;       // how to fix
+  code: 'MISSING_COLUMN' | 'BAD_DATE_FORMAT' | 'DUPLICATE_ID' | 'EMPTY_REQUIRED_CELL' | 'NON_ISO_OUTPUT' | 'INCONSISTENT_STATUS' | string;
+  severity: 'error' | 'warn';
+  message: string;
+  rows?: number[];   // 1-based
+  column?: string;   // header name
+  suggestion?: string;
 };
 
 export type AnalysisResult = {
   ok: boolean;
   issues: Issue[];
-  loads?: Load[];              // present only when ok===true
-  mapping: Record<string,string>; // header→field mapping used
-  meta: { analyzedRows: number; analyzedAt: string };
+  loads?: Load[]; // only present when ok===true
+  mapping: Record<string, string>; // original header -> canonical field
+  meta: { analyzedRows: number; analyzedAt: string; [k: string]: any };
 };
 
 // ---------- Header Synonym Mapping ----------
@@ -45,14 +50,20 @@ const KNOWN_SYNONYMS: Record<string, string[]> = {
   driverName: ['Driver', 'Driver Name'],
   driverPhone: ['Phone', 'Driver Phone', 'Contact'],
   unitNumber: ['Unit', 'Truck', 'Truck #', 'Tractor', 'Unit Number'],
-  broker: ['Broker', 'Customer', 'Shipper']
+  broker: ['Broker', 'Customer', 'Shipper'],
 };
 
 // Required fields (all except driverPhone)
 const REQUIRED_FIELDS = [
-  'loadId', 'fromAddress', 'fromAppointmentDateTimeUTC',
-  'toAddress', 'toAppointmentDateTimeUTC', 'status', 
-  'driverName', 'unitNumber', 'broker'
+  'loadId',
+  'fromAddress',
+  'fromAppointmentDateTimeUTC',
+  'toAddress',
+  'toAppointmentDateTimeUTC',
+  'status',
+  'driverName',
+  'unitNumber',
+  'broker',
 ];
 
 const ALLOWED_MODELS = new Set([
@@ -61,121 +72,75 @@ const ALLOWED_MODELS = new Set([
   'gpt-4o-mini-2024-07-18',
 ]);
 
-// ---------- Security & Validation ----------
-function verifyHmac(secret: string, raw: string, sig: string | undefined): boolean {
-  if (!sig) return false;
-  const h = createHmac('sha256', secret).update(raw).digest('hex');
-  return sig === `sha256=${h}`;
+// ---------- Utilities ----------
+function verifyHmac(secret: string, raw: string, sigHeader: string | undefined): boolean {
+  if (!sigHeader) return false;
+  const digest = createHmac('sha256', secret).update(raw).digest('hex');
+  // Expect format "sha256=..."
+  return sigHeader === `sha256=${digest}`;
+}
+
+function setCors(res: VercelResponse) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Signature');
 }
 
 function extractJson(txt: string): any | null {
   if (!txt) return null;
-  
-  // Try to find JSON in code blocks first
-  const fencedMatch = txt.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  if (fencedMatch?.[1]) {
-    try { return JSON.parse(fencedMatch[1]); } catch {}
+  // Most calls will be strict JSON, but keep this as a safety net.
+  try {
+    return JSON.parse(txt);
+  } catch {
+    // Try fenced code block
+    const fenced = txt.match(/```(?:json)?\s*([\s\S]*?)```/i);
+    if (fenced?.[1]) {
+      try { return JSON.parse(fenced[1]); } catch {}
+    }
+    // Try object slice
+    const start = txt.indexOf('{');
+    const end = txt.lastIndexOf('}');
+    if (start !== -1 && end > start) {
+      try { return JSON.parse(txt.slice(start, end + 1)); } catch {}
+    }
+    return null;
   }
-  
-  // Try to parse the whole response as JSON
-  try { return JSON.parse(txt); } catch {}
-  
-  // Try to find JSON object in text
-  const objStart = txt.indexOf('{');
-  const objEnd = txt.lastIndexOf('}');
-  if (objStart !== -1 && objEnd > objStart) {
-    try { return JSON.parse(txt.slice(objStart, objEnd + 1)); } catch {}
-  }
-  
-  return null;
 }
 
-// ---------- Main Handler ----------
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // CORS headers
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Signature');
+// Build the system prompt once (stable text)
+const SYSTEM_PROMPT = (() => {
+  const synonymsText = Object
+    .entries(KNOWN_SYNONYMS)
+    .map(([field, synonyms]) => `${field}: ${synonyms.join(', ')}`)
+    .join('\n');
 
-  if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-
-  // Check API key
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
-
-  // Optional HMAC verification
-  const hmacSecret = process.env.HMAC_SECRET;
-  if (hmacSecret) {
-    const rawBody = JSON.stringify(req.body || {});
-    const sig = req.headers['x-signature'] as string | undefined;
-    if (!sig || !verifyHmac(hmacSecret, rawBody, sig)) {
-      return res.status(401).json({ error: 'Invalid or missing signature' });
-    }
-  }
-
-  // Extract payload from Google Apps Script
-  const {
-    headers = [],
-    rows = [],
-    knownSynonyms = KNOWN_SYNONYMS,
-    headerOverrides = {},
-    environment = {},
-    expectations = {},
-    note = '',
-    model = 'gpt-4o-mini',
-    temperature = 0
-  } = req.body || {};
-
-  // Validate input
-  if (!Array.isArray(headers) || !Array.isArray(rows)) {
-    return res.status(400).json({ 
-      error: 'Invalid payload', 
-      detail: 'headers and rows must be arrays' 
-    });
-  }
-
-  if (headers.length === 0) {
-    return res.status(400).json({ 
-      error: 'No headers provided', 
-      detail: 'Sheet must have a header row' 
-    });
-  }
-
-  // Model selection and temperature validation
-  const selectedModel = ALLOWED_MODELS.has(model) ? model : 'gpt-4o-mini';
-  const temp = typeof temperature === 'number' && temperature >= 0 && temperature <= 1 ? temperature : 0;
-
-  // Build comprehensive system prompt for TruckTalk Connect
-  const systemPrompt = `You are the TruckTalk Connect analysis engine. You analyze 2D trucking loads data from Google Sheets and return structured results.
+  return `You are the TruckTalk Connect analysis engine. You analyze 2D trucking loads data from Google Sheets and return structured results.
 
 CRITICAL REQUIREMENTS:
-1. Never invent or fabricate data - unknowns must stay empty and be flagged as issues
-2. Normalize ALL datetimes to ISO 8601 UTC format (YYYY-MM-DDTHH:mm:ssZ)
-3. For naive datetimes (no timezone), assume environment.sheetTimezone and convert to UTC
-4. Return mapping as header→field (original header text → canonical field name)
-5. One row = one load (header row excluded from data)
+1. Never invent or fabricate data — unknowns must stay empty and be flagged as issues.
+2. Normalize ALL datetimes to ISO 8601 UTC format (YYYY-MM-DDTHH:mm:ssZ).
+3. For naive datetimes (no timezone), assume environment.sheetTimezone and convert to UTC.
+4. Return mapping as header→field (original header text → canonical field name).
+5. One row = one load (header row excluded from data).
 
-LOAD SCHEMA - Required fields (except driverPhone):
+LOAD SCHEMA - Required fields (driverPhone is optional):
 - loadId: unique identifier
 - fromAddress: pickup location
 - fromAppointmentDateTimeUTC: pickup datetime (ISO 8601 UTC)
-- toAddress: delivery location  
+- toAddress: delivery location
 - toAppointmentDateTimeUTC: delivery datetime (ISO 8601 UTC)
 - status: load status/stage
 - driverName: driver full name
-- unitNumber: truck/vehicle identifier  
+- unitNumber: truck/vehicle identifier
 - broker: broker/customer name
 - driverPhone: (optional) driver contact
 
 HEADER MAPPING - Use these synonyms for field detection:
-${Object.entries(KNOWN_SYNONYMS).map(([field, synonyms]) => 
-  `${field}: ${synonyms.join(', ')}`
-).join('\n')}
+${synonymsText}
 
-VALIDATION CODES - Use these specific issue codes:
+VALIDATION CODES - Use ONLY these codes:
 - MISSING_COLUMN (error): required field has no mapped column
-- DUPLICATE_ID (error): loadId appears multiple times  
+- DUPLICATE_ID (error): loadId appears multiple times
 - BAD_DATE_FORMAT (error): datetime unparseable or invalid
 - EMPTY_REQUIRED_CELL (error): required field is empty
 - NON_ISO_OUTPUT (warn): datetime converted from non-ISO format
@@ -186,66 +151,137 @@ ISSUE FORMAT:
 - rows: 1-based sheet row numbers (header is row 1, data starts row 2)
 - suggestion: actionable fix recommendation
 
-OUTPUT FORMAT - Return ONLY this JSON structure:
+OUTPUT FORMAT — Return ONLY this JSON structure:
 {
   "ok": boolean,
   "issues": Issue[],
-  "loads": Load[] | undefined,  // only present when ok===true
+  "loads": Load[] | undefined,
   "mapping": Record<string,string>,
   "meta": { "analyzedRows": number, "analyzedAt": string }
 }
 
 If ANY errors exist, set ok=false and omit loads array.
-If no errors (only warnings ok), set ok=true and include loads array.`;
+If there are only warnings, set ok=true and include loads array.`;
+})();
 
-  // Build user message with sheet data
-  const userMessage = JSON.stringify({
+// ---------- Main Handler ----------
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  setCors(res);
+
+  // Preflight
+  if (req.method === 'OPTIONS') return res.status(200).end();
+
+  // Health check / simple GET ("?ping=1" returns 200)
+  if (req.method === 'GET') {
+    if (req.query.ping !== undefined) {
+      return res.status(200).json({ ok: true, service: 'TruckTalk AI', ping: 'pong' });
+    }
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  // Secrets
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
+
+  // Optional HMAC
+  const rawBody = JSON.stringify(req.body || {});
+  const hmacSecret = process.env.HMAC_SECRET;
+  if (hmacSecret) {
+    const sig = (req.headers['x-signature'] as string | undefined) || undefined;
+    if (!sig || !verifyHmac(hmacSecret, rawBody, sig)) {
+      return res.status(401).json({ error: 'Invalid or missing signature' });
+    }
+  }
+
+  // Extract & validate payload
+  const {
+    headers = [],
+    rows = [],
+    knownSynonyms = KNOWN_SYNONYMS,
+    headerOverrides = {},
+    environment = {},
+    expectations = {},
+    note = '',
+    model = 'gpt-4o-mini',
+    temperature = 0,
+  } = (req.body || {}) as Record<string, any>;
+
+  if (!Array.isArray(headers) || !Array.isArray(rows)) {
+    return res.status(400).json({
+      error: 'Invalid payload',
+      detail: 'headers and rows must be arrays',
+    });
+  }
+
+  if (headers.length === 0) {
+    return res.status(400).json({
+      error: 'No headers provided',
+      detail: 'Sheet must have a header row',
+    });
+  }
+
+  const selectedModel = ALLOWED_MODELS.has(model) ? model : 'gpt-4o-mini';
+  const temp = typeof temperature === 'number' && temperature >= 0 && temperature <= 1 ? temperature : 0;
+
+  // Limit rows sent to the model to protect tokens
+  const ROW_LIMIT = 200;
+  const limitedRows = Array.isArray(rows) ? rows.slice(0, ROW_LIMIT) : [];
+
+  // Build user message (the analyzable payload)
+  const userPayload = {
     headers,
-    rows: rows.slice(0, 200), // Limit for API payload size
+    rows: limitedRows,
     knownSynonyms,
     headerOverrides,
     environment: {
       sheetTimezone: environment.sheetTimezone || 'UTC',
-      ...environment
+      ...environment,
     },
     expectations: {
       oneRowPerLoad: true,
       hasHeaderRow: true,
       requireAllFields: REQUIRED_FIELDS,
-      ...expectations
+      ...expectations,
     },
     note: note || 'Analyze this trucking loads spreadsheet and validate data quality',
-    instructions: 'Map headers using synonyms, validate all data, normalize datetimes to UTC, return AnalysisResult JSON'
-  });
+    instructions: 'Map headers using synonyms, validate all data, normalize datetimes to UTC, return AnalysisResult JSON',
+  };
+
+  const client = new OpenAI({ apiKey });
 
   try {
-    const client = new OpenAI({ apiKey });
+    console.log(`🚛 TruckTalk Analysis start: model=${selectedModel}, rows_in=${rows.length}, headers=${headers.length}`);
 
-    console.log(`🚛 TruckTalk Analysis: ${rows.length} rows, ${headers.length} headers, model: ${selectedModel}`);
-
-    const response = await client.chat.completions.create({
+    // Use Responses API with JSON mode (strict)
+    const response = await client.responses.create({
       model: selectedModel,
       temperature: temp,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userMessage }
+      response_format: { type: 'json_object' },
+      input: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: JSON.stringify(userPayload) },
       ],
-      max_tokens: 4000
+      max_output_tokens: 2000, // reasonable cap
     });
 
-    const content = response.choices?.[0]?.message?.content || '';
+    // The SDK provides a convenience to get the text output
+    const content = (response as any).output_text ?? '';
     const parsed = extractJson(content);
-    
+
     if (!parsed || typeof parsed !== 'object') {
-      console.error('Invalid AI response:', content.substring(0, 300));
-      return res.status(502).json({ 
-        error: 'AI analysis failed', 
+      console.error('❌ Invalid AI JSON (first 300 chars):', String(content).substring(0, 300));
+      return res.status(500).json({
+        error: 'AI analysis failed',
         detail: 'Model did not return valid JSON format',
-        sample: content.substring(0, 200)
+        sample: String(content).substring(0, 200),
       });
     }
 
-    // Ensure result matches AnalysisResult structure exactly
+    // Shape into our AnalysisResult
     const result: AnalysisResult = {
       ok: Boolean(parsed.ok),
       issues: Array.isArray(parsed.issues) ? parsed.issues : [],
@@ -254,31 +290,39 @@ If no errors (only warnings ok), set ok=true and include loads array.`;
       meta: {
         analyzedRows: rows.length,
         analyzedAt: new Date().toISOString(),
-        ...(parsed.meta && typeof parsed.meta === 'object' ? parsed.meta : {})
-      }
+        ...(parsed.meta && typeof parsed.meta === 'object' ? parsed.meta : {}),
+      },
     };
 
-    // Validate loads structure if present
+    // Validate/clean loads if present (basic structural guardrails)
     if (result.loads) {
-      result.loads = result.loads.filter((load: any) => 
-        load && typeof load === 'object' && 
-        typeof load.loadId === 'string' &&
-        typeof load.fromAddress === 'string' &&
-        typeof load.toAddress === 'string'
+      result.loads = result.loads.filter(
+        (load: any) =>
+          load &&
+          typeof load === 'object' &&
+          typeof load.loadId === 'string' &&
+          typeof load.fromAddress === 'string' &&
+          typeof load.toAddress === 'string',
       );
     }
 
-    console.log(`✅ Analysis complete: ok=${result.ok}, issues=${result.issues.length}, loads=${result.loads?.length || 0}`);
+    console.log(
+      `✅ Analysis complete: ok=${result.ok}, issues=${result.issues.length}, loads=${result.loads?.length || 0}`,
+    );
 
     res.setHeader('Content-Type', 'application/json');
     return res.status(200).json(result);
-
   } catch (err: any) {
-    console.error('🚨 TruckTalk Analysis Error:', err?.message || err);
-    return res.status(500).json({ 
-      error: 'Analysis service failure', 
-      detail: err?.message || 'OpenAI API request failed',
-      type: err?.type || 'unknown_error'
+    // Normalize OpenAI errors for easier debugging
+    const message = err?.message || 'OpenAI request failed';
+    const type = err?.type || 'unknown_error';
+    const status = err?.status || 500;
+
+    console.error('🚨 TruckTalk Analysis Error:', { message, type, status });
+    return res.status(500).json({
+      error: 'Analysis service failure',
+      detail: message,
+      type,
     });
   }
 }

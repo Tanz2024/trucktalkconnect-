@@ -9,7 +9,7 @@
     "build": "tsc --noEmit"
   },
   "dependencies": {
-    "openai": "^5.20.0"
+    "openai": "^5.19.1"
   },
   "devDependencies": {
     "@types/node": "^20.11.30",

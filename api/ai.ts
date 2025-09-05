@@ -1,11 +1,13 @@
-// /api/ai.ts - TruckTalk Connect: Google Sheets Analysis API (fixed)
-// Runtime: Vercel Serverless (Node.js)
+// /api/ai.ts - TruckTalk Connect: Google Sheets Analysis API (stable)
+// Vercel Serverless (Node runtime, NOT Edge)
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createHmac } from 'crypto';
 import OpenAI from 'openai';
 
-// Allow longer executions if needed (Vercel)
+// Ensure Node runtime (Edge would break 'crypto' createHmac)
+export const runtime = 'nodejs';
+// Give a bit more time if needed
 export const config = { maxDuration: 30 };
 
 // ---------- Data Model ----------
@@ -23,7 +25,14 @@ export type Load = {
 };
 
 export type Issue = {
-  code: 'MISSING_COLUMN' | 'BAD_DATE_FORMAT' | 'DUPLICATE_ID' | 'EMPTY_REQUIRED_CELL' | 'NON_ISO_OUTPUT' | 'INCONSISTENT_STATUS' | string;
+  code:
+    | 'MISSING_COLUMN'
+    | 'BAD_DATE_FORMAT'
+    | 'DUPLICATE_ID'
+    | 'EMPTY_REQUIRED_CELL'
+    | 'NON_ISO_OUTPUT'
+    | 'INCONSISTENT_STATUS'
+    | string;
   severity: 'error' | 'warn';
   message: string;
   rows?: number[];   // 1-based
@@ -73,31 +82,28 @@ const ALLOWED_MODELS = new Set([
 ]);
 
 // ---------- Utilities ----------
-function verifyHmac(secret: string, raw: string, sigHeader: string | undefined): boolean {
-  if (!sigHeader) return false;
-  const digest = createHmac('sha256', secret).update(raw).digest('hex');
-  // Expect format "sha256=..."
-  return sigHeader === `sha256=${digest}`;
-}
-
 function setCors(res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Signature');
 }
 
+function verifyHmac(secret: string, raw: string, sigHeader: string | undefined): boolean {
+  if (!sigHeader) return false;
+  const digest = createHmac('sha256', secret).update(raw).digest('hex');
+  // Expect "sha256=<hex>"
+  return sigHeader === `sha256=${digest}`;
+}
+
 function extractJson(txt: string): any | null {
   if (!txt) return null;
-  // Most calls will be strict JSON, but keep this as a safety net.
   try {
     return JSON.parse(txt);
   } catch {
-    // Try fenced code block
     const fenced = txt.match(/```(?:json)?\s*([\s\S]*?)```/i);
     if (fenced?.[1]) {
       try { return JSON.parse(fenced[1]); } catch {}
     }
-    // Try object slice
     const start = txt.indexOf('{');
     const end = txt.lastIndexOf('}');
     if (start !== -1 && end > start) {
@@ -107,7 +113,6 @@ function extractJson(txt: string): any | null {
   }
 }
 
-// Build the system prompt once (stable text)
 const SYSTEM_PROMPT = (() => {
   const synonymsText = Object
     .entries(KNOWN_SYNONYMS)
@@ -171,12 +176,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Preflight
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  // Health check / simple GET ("?ping=1" returns 200)
+  // Health check for GET (no params needed) — useful for "Test connection"
   if (req.method === 'GET') {
-    if (req.query.ping !== undefined) {
-      return res.status(200).json({ ok: true, service: 'TruckTalk AI', ping: 'pong' });
-    }
-    return res.status(405).json({ error: 'Method not allowed' });
+    return res.status(200).json({ ok: true, service: 'TruckTalk AI', runtime, version: '2025-09-05' });
   }
 
   if (req.method !== 'POST') {
@@ -185,7 +187,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   // Secrets
   const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
 
   // Optional HMAC
   const rawBody = JSON.stringify(req.body || {});
@@ -193,7 +194,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (hmacSecret) {
     const sig = (req.headers['x-signature'] as string | undefined) || undefined;
     if (!sig || !verifyHmac(hmacSecret, rawBody, sig)) {
-      return res.status(401).json({ error: 'Invalid or missing signature' });
+      return res.status(401).json({
+        error: 'Invalid or missing signature',
+        hint: 'When HMAC_SECRET is set, sign raw JSON body and send header X-Signature: sha256=<digest>',
+      });
     }
   }
 
@@ -208,8 +212,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     note = '',
     model = 'gpt-4o-mini',
     temperature = 0,
+    mode,            // 'dry-run' to skip OpenAI (for test connection)
+    skipModel,       // boolean alias for dry-run
   } = (req.body || {}) as Record<string, any>;
 
+  // DRY-RUN: return fast without calling OpenAI (great for probes)
+  if (mode === 'dry-run' || skipModel === true) {
+    const hasHeaders = Array.isArray(headers) && headers.length > 0;
+    return res.status(200).json({
+      ok: false,
+      issues: hasHeaders ? [] : [{
+        code: 'NO_HEADERS',
+        severity: 'error',
+        message: 'No headers provided',
+        suggestion: 'Send the first row of your Sheet as "headers".',
+      }],
+      mapping: {},
+      meta: {
+        analyzedRows: Array.isArray(rows) ? rows.length : 0,
+        analyzedAt: new Date().toISOString(),
+        mode: 'dry-run',
+      },
+    } satisfies AnalysisResult);
+  }
+
+  // Normal validation (non-dry-run)
   if (!Array.isArray(headers) || !Array.isArray(rows)) {
     return res.status(400).json({
       error: 'Invalid payload',
@@ -224,12 +251,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   }
 
+  // If OpenAI key missing, fail clearly (but 500 is fine here)
+  if (!apiKey) {
+    return res.status(500).json({
+      error: 'OPENAI_API_KEY not configured',
+      hint: 'Set OPENAI_API_KEY in your Vercel project Environment Variables.',
+    });
+  }
+
   const selectedModel = ALLOWED_MODELS.has(model) ? model : 'gpt-4o-mini';
   const temp = typeof temperature === 'number' && temperature >= 0 && temperature <= 1 ? temperature : 0;
 
   // Limit rows sent to the model to protect tokens
   const ROW_LIMIT = 200;
-  const limitedRows = Array.isArray(rows) ? rows.slice(0, ROW_LIMIT) : [];
+  const limitedRows = rows.slice(0, ROW_LIMIT);
 
   // Build user message (the analyzable payload)
   const userPayload = {
@@ -265,10 +300,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: JSON.stringify(userPayload) },
       ],
-      max_output_tokens: 2000, // reasonable cap
+      max_output_tokens: 2000,
     });
 
-    // The SDK provides a convenience to get the text output
     const content = (response as any).output_text ?? '';
     const parsed = extractJson(content);
 
@@ -281,7 +315,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // Shape into our AnalysisResult
     const result: AnalysisResult = {
       ok: Boolean(parsed.ok),
       issues: Array.isArray(parsed.issues) ? parsed.issues : [],
@@ -294,7 +327,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       },
     };
 
-    // Validate/clean loads if present (basic structural guardrails)
     if (result.loads) {
       result.loads = result.loads.filter(
         (load: any) =>
@@ -306,14 +338,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       );
     }
 
-    console.log(
-      `✅ Analysis complete: ok=${result.ok}, issues=${result.issues.length}, loads=${result.loads?.length || 0}`,
-    );
-
+    console.log(`✅ Analysis complete: ok=${result.ok}, issues=${result.issues.length}, loads=${result.loads?.length || 0}`);
     res.setHeader('Content-Type', 'application/json');
     return res.status(200).json(result);
   } catch (err: any) {
-    // Normalize OpenAI errors for easier debugging
     const message = err?.message || 'OpenAI request failed';
     const type = err?.type || 'unknown_error';
     const status = err?.status || 500;
@@ -323,6 +351,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       error: 'Analysis service failure',
       detail: message,
       type,
+      hint:
+        type === 'insufficient_quota'
+          ? 'Your OpenAI plan/quota may be exhausted. Check billing/quota in the OpenAI dashboard.'
+          : undefined,
     });
   }
 }

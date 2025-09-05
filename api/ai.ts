@@ -1,5 +1,5 @@
-// /api/ai.ts - TruckTalk Connect: Google Sheets Analysis API (stable w/ text.format fix)
-// Vercel Serverless (Node runtime, NOT Edge)
+// /api/ai.ts — TruckTalk Connect: Google Sheets Analysis API (stable)
+// Vercel Serverless (Node runtime)
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createHmac } from 'crypto';
@@ -8,7 +8,7 @@ import OpenAI from 'openai';
 export const runtime = 'nodejs';
 export const config = { maxDuration: 30 };
 
-// ---------- Data Model ----------
+// ---------- Types ----------
 export type Load = {
   loadId: string;
   fromAddress: string;
@@ -46,7 +46,7 @@ export type AnalysisResult = {
   meta: { analyzedRows: number; analyzedAt: string; [k: string]: any };
 };
 
-// ---------- Header Synonym Mapping ----------
+// ---------- Constants ----------
 const KNOWN_SYNONYMS: Record<string, string[]> = {
   loadId: ['Load ID', 'Ref', 'VRID', 'Reference', 'Ref #'],
   fromAddress: ['From', 'PU', 'Pickup', 'Origin', 'Pickup Address'],
@@ -78,14 +78,14 @@ const ALLOWED_MODELS = new Set([
   'gpt-4o-mini-2024-07-18',
 ]);
 
-// ---------- Utilities ----------
+// ---------- Utils ----------
 function setCors(res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Signature');
 }
 
-function verifyHmac(secret: string, raw: string, sigHeader: string | undefined): boolean {
+function verifyHmac(secret: string, raw: string, sigHeader?: string): boolean {
   if (!sigHeader) return false;
   const digest = createHmac('sha256', secret).update(raw).digest('hex');
   return sigHeader === `sha256=${digest}`;
@@ -93,25 +93,16 @@ function verifyHmac(secret: string, raw: string, sigHeader: string | undefined):
 
 function extractJson(txt: string): any | null {
   if (!txt) return null;
-  try {
-    return JSON.parse(txt);
-  } catch {
-    const fenced = txt.match(/```(?:json)?\s*([\s\S]*?)```/i);
-    if (fenced?.[1]) {
-      try { return JSON.parse(fenced[1]); } catch {}
-    }
-    const start = txt.indexOf('{');
-    const end = txt.lastIndexOf('}');
-    if (start !== -1 && end > start) {
-      try { return JSON.parse(txt.slice(start, end + 1)); } catch {}
-    }
-    return null;
-  }
+  try { return JSON.parse(txt); } catch {}
+  const fenced = txt.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fenced?.[1]) { try { return JSON.parse(fenced[1]); } catch {} }
+  const s = txt.indexOf('{'); const e = txt.lastIndexOf('}');
+  if (s !== -1 && e > s) { try { return JSON.parse(txt.slice(s, e + 1)); } catch {} }
+  return null;
 }
 
 const SYSTEM_PROMPT = (() => {
-  const synonymsText = Object
-    .entries(KNOWN_SYNONYMS)
+  const synonymsText = Object.entries(KNOWN_SYNONYMS)
     .map(([field, synonyms]) => `${field}: ${synonyms.join(', ')}`)
     .join('\n');
 
@@ -165,12 +156,14 @@ If ANY errors exist, set ok=false and omit loads array.
 If there are only warnings, set ok=true and include loads array.`;
 })();
 
-// ---------- Main Handler ----------
+// ---------- Handler ----------
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCors(res);
 
+  // Preflight
   if (req.method === 'OPTIONS') return res.status(200).end();
 
+  // Health check
   if (req.method === 'GET') {
     return res.status(200).json({ ok: true, service: 'TruckTalk AI', runtime, version: '2025-09-05' });
   }
@@ -179,7 +172,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Optional HMAC
+  // Accept empty-body POST as a probe (e.g., “Test Connection”)
+  const isEmptyPostProbe =
+    !req.body || (typeof req.body === 'object' && Object.keys(req.body).length === 0);
+  if (isEmptyPostProbe) {
+    return res.status(200).json({
+      ok: true,
+      service: 'TruckTalk AI',
+      mode: 'probe',
+      note: 'POST with empty body accepted for connection test.'
+    });
+  }
+
+  // Optional HMAC (only for real requests)
   const rawBody = JSON.stringify(req.body || {});
   const hmacSecret = process.env.HMAC_SECRET;
   if (hmacSecret) {
@@ -192,7 +197,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   }
 
-  // Extract & validate payload
+  // Extract payload
   const {
     headers = [],
     rows = [],
@@ -203,14 +208,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     note = '',
     model = 'gpt-4o-mini',
     temperature = 0,
-    mode,
-    skipModel,
+    mode,            // 'dry-run' skips OpenAI
+    skipModel,       // alias
   } = (req.body || {}) as Record<string, any>;
 
-  // Dry-run (skip OpenAI) for connection tests
+  // Dry-run: skip OpenAI (nice for quick checks)
   if (mode === 'dry-run' || skipModel === true) {
     const hasHeaders = Array.isArray(headers) && headers.length > 0;
-    return res.status(200).json({
+    const resp: AnalysisResult = {
       ok: false,
       issues: hasHeaders ? [] : [{
         code: 'NO_HEADERS',
@@ -224,23 +229,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         analyzedAt: new Date().toISOString(),
         mode: 'dry-run',
       },
-    } satisfies AnalysisResult);
+    };
+    return res.status(200).json(resp);
   }
 
+  // Validate payload
   if (!Array.isArray(headers) || !Array.isArray(rows)) {
-    return res.status(400).json({
-      error: 'Invalid payload',
-      detail: 'headers and rows must be arrays',
-    });
+    return res.status(400).json({ error: 'Invalid payload', detail: 'headers and rows must be arrays' });
   }
-
   if (headers.length === 0) {
-    return res.status(400).json({
-      error: 'No headers provided',
-      detail: 'Sheet must have a header row',
-    });
+    return res.status(400).json({ error: 'No headers provided', detail: 'Sheet must have a header row' });
   }
 
+  // OpenAI key
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     return res.status(500).json({
@@ -252,9 +253,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const selectedModel = ALLOWED_MODELS.has(model) ? model : 'gpt-4o-mini';
   const temp = typeof temperature === 'number' && temperature >= 0 && temperature <= 1 ? temperature : 0;
 
+  // Limit rows to protect tokens
   const ROW_LIMIT = 200;
   const limitedRows = rows.slice(0, ROW_LIMIT);
 
+  // Build user payload for the model
   const userPayload = {
     headers,
     rows: limitedRows,
@@ -279,11 +282,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     console.log(`🚛 TruckTalk Analysis start: model=${selectedModel}, rows_in=${rows.length}, headers=${headers.length}`);
 
-    // ✅ Responses API with strict JSON via text.format (object form)
+    // Responses API — strict JSON via text.format.type
     const response = await client.responses.create({
       model: selectedModel,
       temperature: temp,
-      text: { format: { type: 'json' } }, // <-- FIXED: object, not string
+      text: { format: { type: 'json_object' } },
       input: [
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: JSON.stringify(userPayload) },
@@ -303,6 +306,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
+    // Shape final result
     const result: AnalysisResult = {
       ok: Boolean(parsed.ok),
       issues: Array.isArray(parsed.issues) ? parsed.issues : [],
@@ -315,6 +319,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       },
     };
 
+    // Basic structural guardrails on loads
     if (result.loads) {
       result.loads = result.loads.filter(
         (load: any) =>
@@ -343,7 +348,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         type === 'insufficient_quota'
           ? 'Your OpenAI plan/quota may be exhausted. Check billing/quota in the OpenAI dashboard.'
           : type === 'invalid_request_error'
-          ? 'Double-check model name and parameters (use text.format object for JSON in Responses API).'
+          ? 'Double-check model name and parameters (Responses API uses text.format.type = "json_object").'
           : undefined,
     });
   }

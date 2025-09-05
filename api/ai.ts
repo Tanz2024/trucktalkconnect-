@@ -1,13 +1,11 @@
-// /api/ai.ts - TruckTalk Connect: Google Sheets Analysis API (stable w/ text.format)
+// /api/ai.ts - TruckTalk Connect: Google Sheets Analysis API (stable w/ text.format fix)
 // Vercel Serverless (Node runtime, NOT Edge)
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createHmac } from 'crypto';
 import OpenAI from 'openai';
 
-// Ensure Node runtime (Edge would break 'crypto' createHmac)
 export const runtime = 'nodejs';
-// Give a bit more time if needed
 export const config = { maxDuration: 30 };
 
 // ---------- Data Model ----------
@@ -62,7 +60,6 @@ const KNOWN_SYNONYMS: Record<string, string[]> = {
   broker: ['Broker', 'Customer', 'Shipper'],
 };
 
-// Required fields (all except driverPhone)
 const REQUIRED_FIELDS = [
   'loadId',
   'fromAddress',
@@ -91,7 +88,6 @@ function setCors(res: VercelResponse) {
 function verifyHmac(secret: string, raw: string, sigHeader: string | undefined): boolean {
   if (!sigHeader) return false;
   const digest = createHmac('sha256', secret).update(raw).digest('hex');
-  // Expect "sha256=<hex>"
   return sigHeader === `sha256=${digest}`;
 }
 
@@ -173,10 +169,8 @@ If there are only warnings, set ok=true and include loads array.`;
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCors(res);
 
-  // Preflight
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  // Health check for GET (no params needed)
   if (req.method === 'GET') {
     return res.status(200).json({ ok: true, service: 'TruckTalk AI', runtime, version: '2025-09-05' });
   }
@@ -209,11 +203,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     note = '',
     model = 'gpt-4o-mini',
     temperature = 0,
-    mode,            // 'dry-run' to skip OpenAI (for test connection)
-    skipModel,       // boolean alias for dry-run
+    mode,
+    skipModel,
   } = (req.body || {}) as Record<string, any>;
 
-  // DRY-RUN: return fast without calling OpenAI
+  // Dry-run (skip OpenAI) for connection tests
   if (mode === 'dry-run' || skipModel === true) {
     const hasHeaders = Array.isArray(headers) && headers.length > 0;
     return res.status(200).json({
@@ -247,7 +241,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   }
 
-  // Secrets
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     return res.status(500).json({
@@ -259,11 +252,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const selectedModel = ALLOWED_MODELS.has(model) ? model : 'gpt-4o-mini';
   const temp = typeof temperature === 'number' && temperature >= 0 && temperature <= 1 ? temperature : 0;
 
-  // Limit rows sent to the model to protect tokens
   const ROW_LIMIT = 200;
   const limitedRows = rows.slice(0, ROW_LIMIT);
 
-  // Build user message (the analyzable payload)
   const userPayload = {
     headers,
     rows: limitedRows,
@@ -288,12 +279,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     console.log(`🚛 TruckTalk Analysis start: model=${selectedModel}, rows_in=${rows.length}, headers=${headers.length}`);
 
-    // Responses API with strict JSON via text.format
+    // ✅ Responses API with strict JSON via text.format (object form)
     const response = await client.responses.create({
       model: selectedModel,
       temperature: temp,
-      // NEW required shape: ask the text output to be JSON
-      text: { format: 'json' },
+      text: { format: { type: 'json' } }, // <-- FIXED: object, not string
       input: [
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: JSON.stringify(userPayload) },
@@ -301,7 +291,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       max_output_tokens: 2000,
     });
 
-    // Pull text; on Responses API this is the simplest way
     const content = (response as any).output_text ?? '';
     const parsed = extractJson(content);
 
@@ -354,7 +343,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         type === 'insufficient_quota'
           ? 'Your OpenAI plan/quota may be exhausted. Check billing/quota in the OpenAI dashboard.'
           : type === 'invalid_request_error'
-          ? 'Double-check model name and parameters (use text.format for JSON in Responses API).'
+          ? 'Double-check model name and parameters (use text.format object for JSON in Responses API).'
           : undefined,
     });
   }

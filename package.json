@@ -1,20 +1,19 @@
 {
+  "private": true,
   "name": "trucktalkconnect-api",
   "version": "1.0.0",
-  "engines": {
-    "node": ">=18"
-  },
+  "engines": { "node": ">=18" },
   "scripts": {
     "dev": "vercel dev",
     "deploy": "vercel --prod",
-    "build": "tsc"
-  },
-  "devDependencies": {
-    "@types/node": "^18.0.0",
-    "@vercel/node": "^5.3.20",
-    "typescript": "^5.0.0"
+    "build": "tsc --noEmit"
   },
   "dependencies": {
-    "openai": "^5.19.1"
+    "openai": "^5.20.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.30",
+    "@vercel/node": "^5.3.20",
+    "typescript": "^5.4.5"
   }
 }

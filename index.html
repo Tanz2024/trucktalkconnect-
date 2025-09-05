@@ -13,7 +13,7 @@
 <body>
     <h2>AI Gateway</h2>
     <p>Simple proxy service for chat completions.</p>
-    
+
     <div>
         <strong>Endpoint:</strong> <code>/api/ai</code><br>
         <strong>Method:</strong> POST<br>
@@ -27,22 +27,24 @@
         async function testAPI() {
             const btn = document.querySelector('.test-btn');
             const result = document.getElementById('result');
-            
+
             btn.textContent = 'Testing...';
             result.style.display = 'none';
-            
+
             try {
                 const response = await fetch('/api/ai', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        model: 'gpt-4o-mini',
-                        messages: [{ role: 'user', content: 'ping' }]
+                        headers: ['Load ID', 'Status'],
+                        rows: [['TEST-123', 'Active']],
+                        model: 'gpt-4o-mini'
                     })
                 });
-                
+
                 if (response.ok) {
-                    result.innerHTML = '<strong>✓ Connection successful</strong><br>Service is working normally.';
+                    const data = await response.json();
+                    result.innerHTML = '<strong>✓ Connection successful</strong><br>OpenAI API is working. Response: ' + JSON.stringify(data).substring(0, 100) + '...';
                     result.style.backgroundColor = '#d4edda';
                 } else {
                     result.innerHTML = '<strong>✗ Connection failed</strong><br>Status: ' + response.status;
@@ -52,7 +54,7 @@
                 result.innerHTML = '<strong>✗ Network error</strong><br>' + e.message;
                 result.style.backgroundColor = '#f8d7da';
             }
-            
+
             result.style.display = 'block';
             btn.textContent = 'Test Connection';
         }

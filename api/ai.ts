@@ -1,4 +1,4 @@
-// /api/ai.ts - TruckTalk Connect: Google Sheets Analysis API (stable)
+// /api/ai.ts - TruckTalk Connect: Google Sheets Analysis API (stable w/ text.format)
 // Vercel Serverless (Node runtime, NOT Edge)
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
@@ -176,7 +176,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Preflight
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  // Health check for GET (no params needed) — useful for "Test connection"
+  // Health check for GET (no params needed)
   if (req.method === 'GET') {
     return res.status(200).json({ ok: true, service: 'TruckTalk AI', runtime, version: '2025-09-05' });
   }
@@ -184,9 +184,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
-
-  // Secrets
-  const apiKey = process.env.OPENAI_API_KEY;
 
   // Optional HMAC
   const rawBody = JSON.stringify(req.body || {});
@@ -216,7 +213,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     skipModel,       // boolean alias for dry-run
   } = (req.body || {}) as Record<string, any>;
 
-  // DRY-RUN: return fast without calling OpenAI (great for probes)
+  // DRY-RUN: return fast without calling OpenAI
   if (mode === 'dry-run' || skipModel === true) {
     const hasHeaders = Array.isArray(headers) && headers.length > 0;
     return res.status(200).json({
@@ -236,7 +233,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     } satisfies AnalysisResult);
   }
 
-  // Normal validation (non-dry-run)
   if (!Array.isArray(headers) || !Array.isArray(rows)) {
     return res.status(400).json({
       error: 'Invalid payload',
@@ -251,7 +247,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   }
 
-  // If OpenAI key missing, fail clearly (but 500 is fine here)
+  // Secrets
+  const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     return res.status(500).json({
       error: 'OPENAI_API_KEY not configured',
@@ -291,11 +288,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     console.log(`🚛 TruckTalk Analysis start: model=${selectedModel}, rows_in=${rows.length}, headers=${headers.length}`);
 
-    // Use Responses API with JSON mode (strict)
+    // Responses API with strict JSON via text.format
     const response = await client.responses.create({
       model: selectedModel,
       temperature: temp,
-      response_format: { type: 'json_object' },
+      // NEW required shape: ask the text output to be JSON
+      text: { format: 'json' },
       input: [
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: JSON.stringify(userPayload) },
@@ -303,6 +301,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       max_output_tokens: 2000,
     });
 
+    // Pull text; on Responses API this is the simplest way
     const content = (response as any).output_text ?? '';
     const parsed = extractJson(content);
 
@@ -354,6 +353,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       hint:
         type === 'insufficient_quota'
           ? 'Your OpenAI plan/quota may be exhausted. Check billing/quota in the OpenAI dashboard.'
+          : type === 'invalid_request_error'
+          ? 'Double-check model name and parameters (use text.format for JSON in Responses API).'
           : undefined,
     });
   }

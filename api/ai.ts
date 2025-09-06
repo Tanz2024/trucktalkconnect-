@@ -11,9 +11,9 @@ export const config = { maxDuration: 30 };
 export type Load = {
   loadId: string;
   fromAddress: string;
-  fromAppointmentDateTimeUTC: string; // ISO 8601 (UTC)
+  fromAppointmentDateTimeUTC: string; 
   toAddress: string;
-  toAppointmentDateTimeUTC: string;   // ISO 8601 (UTC)
+  toAppointmentDateTimeUTC: string;   
   status: string;
   driverName: string;
   driverPhone?: string;
@@ -32,16 +32,16 @@ export type Issue = {
     | string;
   severity: 'error' | 'warn';
   message: string;
-  rows?: number[];   // 1-based
-  column?: string;   // header name or canonical field
+  rows?: number[];
+  column?: string;   
   suggestion?: string;
 };
 
 export type AnalysisResult = {
   ok: boolean;
   issues: Issue[];
-  loads?: Load[]; // only present when ok===true
-  mapping: Record<string, string>; // original header -> canonical field
+  loads?: Load[]; 
+  mapping: Record<string, string>; 
   meta: {
     analyzedRows: number;
     analyzedAt: string;
@@ -51,7 +51,7 @@ export type AnalysisResult = {
   };
 };
 
-// ---------- Constants ----------
+
 const KNOWN_SYNONYMS: Record<string, string[]> = {
   loadId: ['Load ID', 'Ref', 'VRID', 'Reference', 'Ref #'],
   fromAddress: ['From', 'PU', 'Pickup', 'Origin', 'Pickup Address'],
@@ -86,13 +86,13 @@ const ALLOWED_MODELS = new Set([
 const ROW_LIMIT = 200;
 const ISO_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
 
-// ---------- Utils ----------
+
 function setCors(res: VercelResponse, req?: VercelRequest) {
   const allowed = new Set([
     'https://script.google.com',
     'https://docs.google.com',
     'https://sheets.google.com',
-    'null', // file:// or Apps Script sandbox can appear as "null"
+    'null', 
   ]);
 
   const originHdr = (req?.headers?.origin as string | undefined) ?? '';
@@ -101,8 +101,7 @@ function setCors(res: VercelResponse, req?: VercelRequest) {
   const allowOrigin =
     isDev ? '*' :
     (originHdr && allowed.has(originHdr)) ? originHdr :
-    ''; // empty string -> no CORS header
-
+    '';
   if (allowOrigin) res.setHeader('Access-Control-Allow-Origin', allowOrigin);
   res.setHeader('Vary', 'Origin'); // ensure proper caching behavior
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -125,7 +124,7 @@ function extractJson(txt: string): any | null {
   return null;
 }
 
-// Safer extraction for OpenAI Responses API shapes
+
 function pickOutputText(resp: any): string {
   if (!resp) return '';
   if (typeof resp.output_text === 'string') return resp.output_text;
@@ -145,11 +144,11 @@ function pickOutputText(resp: any): string {
     } catch {}
   }
 
-  // Last resort: stringify
+
   return typeof resp === 'string' ? resp : JSON.stringify(resp);
 }
 
-// Placeholder/fabrication detector for required fields
+
 function looksLikePlaceholder(v: unknown): boolean {
   if (typeof v !== 'string') return false;
   const t = v.trim();
@@ -169,6 +168,7 @@ CRITICAL REQUIREMENTS:
 3. For naive datetimes (no timezone), assume environment.sheetTimezone and convert to UTC.
 4. Return mapping as header→field (original header text → canonical field name).
 5. One row = one load (header row excluded from data).
+6. Load IDs will be automatically sorted for better organization.
 
 LOAD SCHEMA - Required fields (driverPhone is optional):
 - loadId: unique identifier
@@ -223,7 +223,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  // Health check
+
   if (req.method === 'GET') {
     return res.status(200).json({ ok: true, service: 'TruckTalk AI', runtime, version: '2025-09-06' });
   }
@@ -232,7 +232,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Accept empty-body POST as a probe (e.g., “Test Connection”)
+ 
   const isEmptyPostProbe =
     !req.body || (typeof req.body === 'object' && Object.keys(req.body).length === 0);
   if (isEmptyPostProbe) {
@@ -244,8 +244,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   }
 
-  // Optional HMAC (only for real requests)
-  // NOTE: Contract is "sign EXACT JSON.stringify(payload) used in this request body".
+  
   const rawBody = JSON.stringify(req.body || {});
   const hmacSecret = process.env.HMAC_SECRET;
   if (hmacSecret) {
@@ -270,8 +269,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     note = '',
     model = 'gpt-4o-mini',
     temperature = 0,
-    mode,            // 'dry-run' skips OpenAI
-    skipModel,       // alias
+    mode,            
+    skipModel,       
   } = (req.body || {}) as Record<string, any>;
 
   // Dry-run: skip OpenAI (nice for quick checks)
@@ -397,6 +396,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           typeof load.fromAddress === 'string' &&
           typeof load.toAddress === 'string',
       );
+      
+      // Sort loads by loadId for better organization
+      // Handle mixed numeric/alphanumeric IDs intelligently
+      result.loads.sort((a: any, b: any) => {
+        const idA = String(a.loadId || '');
+        const idB = String(b.loadId || '');
+        
+        // Extract numeric parts for smart sorting
+        const numA = idA.match(/\d+/);
+        const numB = idB.match(/\d+/);
+        
+        // If both have numbers, sort numerically by the first number found
+        if (numA && numB) {
+          const nA = parseInt(numA[0], 10);
+          const nB = parseInt(numB[0], 10);
+          if (nA !== nB) return nA - nB;
+        }
+        
+        // Fall back to alphabetical sorting
+        return idA.localeCompare(idB, 'en', { numeric: true, sensitivity: 'base' });
+      });
+      
+      // Add sorting note to meta
+      if (result.loads.length > 1) {
+        result.meta.normalizationNotes = result.meta.normalizationNotes || [];
+        result.meta.normalizationNotes.push('Loads sorted by Load ID for better organization');
+      }
     }
 
     // ---- Server-side guardrails ----

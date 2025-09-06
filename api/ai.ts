@@ -1,5 +1,4 @@
-// /api/ai.ts — TruckTalk Connect: Google Sheets Analysis API (stable, hardened)
-// Vercel Serverless (Node runtime)
+
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createHmac } from 'crypto';
@@ -8,7 +7,7 @@ import OpenAI from 'openai';
 export const runtime = 'nodejs';
 export const config = { maxDuration: 30 };
 
-// ---------- Types ----------
+//Sections
 export type Load = {
   loadId: string;
   fromAddress: string;
@@ -88,8 +87,24 @@ const ROW_LIMIT = 200;
 const ISO_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
 
 // ---------- Utils ----------
-function setCors(res: VercelResponse) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+function setCors(res: VercelResponse, req?: VercelRequest) {
+  const allowed = new Set([
+    'https://script.google.com',
+    'https://docs.google.com',
+    'https://sheets.google.com',
+    'null', // file:// or Apps Script sandbox can appear as "null"
+  ]);
+
+  const originHdr = (req?.headers?.origin as string | undefined) ?? '';
+  const isDev = process.env.NODE_ENV === 'development';
+
+  const allowOrigin =
+    isDev ? '*' :
+    (originHdr && allowed.has(originHdr)) ? originHdr :
+    ''; // empty string -> no CORS header
+
+  if (allowOrigin) res.setHeader('Access-Control-Allow-Origin', allowOrigin);
+  res.setHeader('Vary', 'Origin'); // ensure proper caching behavior
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Signature');
 }
@@ -138,7 +153,7 @@ function pickOutputText(resp: any): string {
 function looksLikePlaceholder(v: unknown): boolean {
   if (typeof v !== 'string') return false;
   const t = v.trim();
-  return /^(unknown|n\/a|na|none|null|no data|not provided)$/i.test(t);
+  return /^(unknown|n\/a|na|none|null|no data|not provided|tbd|pending|-)$/i.test(t);
 }
 
 const SYSTEM_PROMPT = (() => {
@@ -201,11 +216,11 @@ If ANY errors exist, set ok=false and omit loads array.
 If there are only warnings, set ok=true and include loads array.`;
 })();
 
-// ---------- Handler ----------
+//header
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  setCors(res);
+  setCors(res, req);
 
-  // Preflight
+
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   // Health check
@@ -304,6 +319,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   // Limit rows to protect tokens
   const limitedRows = rows.slice(0, ROW_LIMIT);
+  const limitedCount = limitedRows.length;
 
   // Build user payload for the model
   const userPayload = {
@@ -328,7 +344,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const client = new OpenAI({ apiKey });
 
   try {
-    console.log(`🚛 TruckTalk Analysis start: model=${selectedModel}, rows_in=${rows.length}, headers=${headers.length}`);
+    console.log(` TruckTalk Analysis start: model=${selectedModel}, rows_in=${rows.length}, headers=${headers.length}`);
 
     // Responses API — strict JSON via text.format.type
     const response = await client.responses.create({
@@ -346,7 +362,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const parsed = extractJson(content);
 
     if (!parsed || typeof parsed !== 'object') {
-      console.error('❌ Invalid AI JSON (first 300 chars):', String(content).substring(0, 300));
+      console.error(' Invalid AI JSON (first 300 chars):', String(content).substring(0, 300));
       return res.status(500).json({
         error: 'AI analysis failed',
         detail: 'Model did not return valid JSON format',
@@ -361,7 +377,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       loads: parsed.ok && Array.isArray(parsed.loads) ? parsed.loads : undefined,
       mapping: parsed.mapping && typeof parsed.mapping === 'object' ? parsed.mapping : {},
       meta: {
-        analyzedRows: rows.length,
+        analyzedRows: limitedCount, // report actual analyzed count, not input count
         analyzedAt: new Date().toISOString(),
         ...(parsed.meta && typeof parsed.meta === 'object' ? parsed.meta : {}),
       },
@@ -385,7 +401,45 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // ---- Server-side guardrails ----
 
-    // A) Recompute ok based on issues; strip loads if any error exists
+    // A) Baseline missing-column detection (deterministic check)
+    const mappedCanon = new Set(Object.values(result.mapping || {}));
+    for (const req of REQUIRED_FIELDS as readonly string[]) {
+      if (!mappedCanon.has(req)) {
+        result.issues.push({
+          code: 'MISSING_COLUMN',
+          severity: 'error',
+          message: `Missing required column for "${req}"`,
+          column: req,
+          suggestion: `Add a column for "${req}" or map an existing header to it (see synonyms).`,
+        });
+      }
+    }
+
+    // B) Server-side duplicate loadId check (cheap and reliable)
+    if (result.loads && Array.isArray(result.loads)) {
+      const seen = new Map<string, number[]>(); // loadId -> sheet rows (1-based)
+      result.loads.forEach((l, idx) => {
+        const id = String(l.loadId || '');
+        if (!id) return; // will be caught by EMPTY_REQUIRED_CELL
+        const arr = seen.get(id) ?? [];
+        arr.push(idx + 2);
+        seen.set(id, arr);
+      });
+      for (const [id, rows1b] of seen) {
+        if (rows1b.length > 1) {
+          result.issues.push({
+            code: 'DUPLICATE_ID',
+            severity: 'error',
+            message: `loadId "${id}" appears ${rows1b.length} times`,
+            rows: rows1b,
+            column: 'loadId',
+            suggestion: 'Ensure each loadId is unique.',
+          });
+        }
+      }
+    }
+
+    // C) Recompute ok based on issues; strip loads if any error exists
     const hasErrors = Array.isArray(result.issues) && result.issues.some(i => i?.severity === 'error');
     if (hasErrors) {
       result.ok = false;
@@ -394,7 +448,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       result.ok = true;
     }
 
-    // B) Ensure ISO-8601 UTC for the two datetime fields; warn if not
+    // D) Ensure ISO-8601 UTC for the two datetime fields; warn if not
     if (result.loads && Array.isArray(result.loads)) {
       result.loads.forEach((load, idx) => {
         (['fromAppointmentDateTimeUTC','toAppointmentDateTimeUTC'] as const).forEach(col => {
@@ -425,7 +479,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // C/D) Flag suspicious placeholders for required fields as EMPTY_REQUIRED_CELL
+    // E) Flag suspicious placeholders for required fields as EMPTY_REQUIRED_CELL
     if (result.loads && Array.isArray(result.loads)) {
       result.loads.forEach((load, idx) => {
         (REQUIRED_FIELDS as readonly string[]).forEach((f) => {
@@ -451,7 +505,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       delete result.loads;
     }
 
-    console.log(`✅ Analysis complete: ok=${result.ok}, issues=${result.issues.length}, loads=${result.loads?.length || 0}`);
+    console.log(` Analysis complete: ok=${result.ok}, issues=${result.issues.length}, loads=${result.loads?.length || 0}`);
     res.setHeader('Content-Type', 'application/json');
     return res.status(200).json(result);
   } catch (err: any) {
@@ -459,8 +513,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const type = err?.type || 'unknown_error';
     const status = err?.status || 500;
 
-    console.error('🚨 TruckTalk Analysis Error:', { message, type, status });
-    return res.status(500).json({
+    console.error(' TruckTalk Analysis Error:', { message, type, status });
+    return res.status(status).json({
       error: 'Analysis service failure',
       detail: message,
       type,

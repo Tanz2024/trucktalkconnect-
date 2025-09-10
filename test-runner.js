@@ -1,10 +1,7 @@
-/**
- * TruckTalk Connect - Test Results Simulation
- * This file simulates running all the tests to validate functionality
- */
+
 
 // Test 1: Date Normalization Tests
-console.log('🔍 Testing normalizeDate function...');
+console.log(' Testing normalizeDate function...');
 
 // Simulate the normalizeDate function logic
 function simulateNormalizeDate(input) {
@@ -175,7 +172,7 @@ loadIdTests.forEach(function(test) {
 console.log('Load ID tests: ' + loadIdPassedTests + '/' + loadIdTests.length + ' passed\n');
 
 // Test 5: Time Normalization Tests
-console.log('🔍 Testing normalizeTime function...');
+console.log(' Testing normalizeTime function...');
 
 function simulateNormalizeTime(input) {
   if (!input || typeof input !== 'string') return '';
@@ -232,7 +229,7 @@ console.log('Time tests: ' + timePassedTests + '/' + timeTests.length + ' passed
 var totalTests = dateTests.length + phoneTests.length + statusTests.length + loadIdTests.length + timeTests.length;
 var totalPassed = datePassedTests + phonePassedTests + statusPassedTests + loadIdPassedTests + timePassedTests;
 
-console.log('📊 TEST SUMMARY:');
+console.log(' TEST SUMMARY:');
 console.log('================');
 console.log('Total Tests: ' + totalTests);
 console.log('Passed: ' + totalPassed);
@@ -240,8 +237,8 @@ console.log('Failed: ' + (totalTests - totalPassed));
 console.log('Success Rate: ' + Math.round((totalPassed / totalTests) * 100) + '%');
 
 if (totalPassed === totalTests) {
-  console.log('\n✅ ALL TESTS PASSED!');
-  console.log('🎉 TruckTalk Connect utilities are working perfectly!');
+  console.log('\n ALL TESTS PASSED!');
+  console.log(' TruckTalk Connect utilities are working perfectly!');
 } else {
-  console.log('\n❌ Some tests failed. Check individual test results above.');
+  console.log('\n Some tests failed. Check individual test results above.');
 }

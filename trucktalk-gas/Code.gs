@@ -4285,6 +4285,12 @@ function callTruckTalkAIAPI(payload, requestId) {
     
     Logger.log(`[${requestId}] Calling API: ${endpoint}`);
     
+    // Check HMAC configuration
+    if (!hmacSecret) {
+      Logger.log(`[${requestId}] WARNING: HMAC secret not configured - API may reject request`);
+      Logger.log(`[${requestId}] Run setupTruckTalkConfig() to configure HMAC authentication`);
+    }
+    
     // Prepare request with stable JSON serialization for HMAC
     const timestamp = String(Date.now());
     const bodyString = stableStringify(payload);
@@ -4379,7 +4385,9 @@ function callTruckTalkAIAPI(payload, requestId) {
       return { 
         success: false, 
         error: 'Authentication failed. Invalid or missing HMAC signature.',
-        suggestion: 'Check HMAC configuration in Script Properties'
+        suggestion: hmacSecret ? 
+          'HMAC signature invalid. Check if the secret key is correct.' :
+          'HMAC secret not configured. Run setupTruckTalkConfig() to set up authentication.'
       };
     } else {
       // Other errors
@@ -4446,6 +4454,95 @@ function stableStringify(obj) {
  */
 function generateRequestId() {
   return Utilities.getUuid().substring(0, 8);
+}
+
+/**
+ * Setup TruckTalk Connect configuration
+ * Call this function once to configure the HMAC secret and API endpoint
+ */
+function setupTruckTalkConfig() {
+  const ui = SpreadsheetApp.getUi();
+  
+  try {
+    // Get current properties
+    const properties = PropertiesService.getScriptProperties();
+    const currentSecret = properties.getProperty('TTC_HMAC_SECRET');
+    const currentEndpoint = properties.getProperty('TTC_API_ENDPOINT');
+    
+    // Show current configuration
+    let configStatus = 'CURRENT CONFIGURATION:\n\n';
+    configStatus += `HMAC Secret: ${currentSecret ? '[SET - ' + currentSecret.substring(0, 8) + '...]' : '[NOT SET]'}\n`;
+    configStatus += `API Endpoint: ${currentEndpoint || '[USING DEFAULT]'}\n\n`;
+    configStatus += 'Choose an option to update configuration:';
+    
+    const result = ui.alert(
+      'TruckTalk Connect Configuration',
+      configStatus,
+      ui.ButtonSet.YES_NO_CANCEL
+    );
+    
+    if (result === ui.Button.YES) {
+      // Set HMAC Secret
+      const secretResponse = ui.prompt(
+        'Set HMAC Secret',
+        'Enter the HMAC secret key (leave empty to disable HMAC):',
+        ui.ButtonSet.OK_CANCEL
+      );
+      
+      if (secretResponse.getSelectedButton() === ui.Button.OK) {
+        const secret = secretResponse.getResponseText().trim();
+        if (secret) {
+          properties.setProperty('TTC_HMAC_SECRET', secret);
+          ui.alert('Success', 'HMAC secret has been set successfully!', ui.ButtonSet.OK);
+        } else {
+          properties.deleteProperty('TTC_HMAC_SECRET');
+          ui.alert('Info', 'HMAC authentication disabled.', ui.ButtonSet.OK);
+        }
+      }
+    } else if (result === ui.Button.NO) {
+      // Set Custom Endpoint
+      const endpointResponse = ui.prompt(
+        'Set API Endpoint',
+        'Enter custom API endpoint (leave empty for default):',
+        ui.ButtonSet.OK_CANCEL
+      );
+      
+      if (endpointResponse.getSelectedButton() === ui.Button.OK) {
+        const endpoint = endpointResponse.getResponseText().trim();
+        if (endpoint) {
+          properties.setProperty('TTC_API_ENDPOINT', endpoint);
+          ui.alert('Success', 'Custom API endpoint has been set successfully!', ui.ButtonSet.OK);
+        } else {
+          properties.deleteProperty('TTC_API_ENDPOINT');
+          ui.alert('Info', 'Using default API endpoint.', ui.ButtonSet.OK);
+        }
+      }
+    }
+    
+    // Show final configuration
+    const finalSecret = properties.getProperty('TTC_HMAC_SECRET');
+    const finalEndpoint = properties.getProperty('TTC_API_ENDPOINT');
+    
+    let finalStatus = 'FINAL CONFIGURATION:\n\n';
+    finalStatus += `HMAC Secret: ${finalSecret ? '[SET]' : '[NOT SET - API calls may fail]'}\n`;
+    finalStatus += `API Endpoint: ${finalEndpoint || 'https://trucktalkconnect-awaayixg7-tanzs-projects-ccb5cdb8.vercel.app/api/ai'}\n\n`;
+    finalStatus += finalSecret ? 'Ready for secure API calls!' : 'Warning: HMAC not configured - API calls may be rejected.';
+    
+    ui.alert('Configuration Complete', finalStatus, ui.ButtonSet.OK);
+    
+    return {
+      success: true,
+      hmacConfigured: !!finalSecret,
+      endpoint: finalEndpoint || 'https://trucktalkconnect-awaayixg7-tanzs-projects-ccb5cdb8.vercel.app/api/ai'
+    };
+    
+  } catch (error) {
+    ui.alert('Configuration Error', 'Failed to setup configuration: ' + error.toString(), ui.ButtonSet.OK);
+    return {
+      success: false,
+      error: error.toString()
+    };
+  }
 }
 
 

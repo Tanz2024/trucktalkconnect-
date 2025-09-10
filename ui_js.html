@@ -1,0 +1,694 @@
+<script>
+// =============================================================================
+// TruckTalk Connect - UI JavaScript
+// Following exact UX flow specification
+// =============================================================================
+
+// Global state
+let currentAnalysis = null;
+let chatHistory = [];
+let isAnalyzing = false;
+let analyzeDebounceTimer = null;
+
+// Initialize on load
+document.addEventListener('DOMContentLoaded', function() {
+  initializeUI();
+  loadChatHistory();
+});
+
+/**
+ * Initialize UI components
+ */
+function initializeUI() {
+  // Tab switching
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+  });
+  
+  // Load any cached analysis
+  loadCachedAnalysis();
+  
+  console.log('TruckTalk Connect UI initialized');
+}
+
+/**
+ * Switch between Chat and Results tabs
+ */
+function switchTab(tabName) {
+  // Update tab buttons
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.classList.remove('active');
+  });
+  document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+  
+  // Update tab content
+  document.querySelectorAll('.tab-content').forEach(content => {
+    content.classList.remove('active');
+  });
+  document.getElementById(`${tabName}-tab`).classList.add('active');
+}
+
+/**
+ * Main analysis function - "Analyze current tab" (debounced)
+ */
+function analyzeCurrentTab() {
+  // Clear any existing debounce timer
+  if (analyzeDebounceTimer) {
+    clearTimeout(analyzeDebounceTimer);
+  }
+  
+  // Debounce to prevent rapid clicks (complements server-side rate limiting)
+  analyzeDebounceTimer = setTimeout(() => {
+    performAnalysis();
+  }, 1500); // 1.5 second debounce
+}
+
+/**
+ * Internal analysis function (actual implementation)
+ */
+function performAnalysis() {
+  if (isAnalyzing) return;
+  
+  isAnalyzing = true;
+  updateStatus('analyzing', 'Analyzing spreadsheet data...');
+  
+  // Add user message to chat
+  addChatMessage('user', 'Analyze this tab.');
+  
+  // Disable buttons
+  document.getElementById('analyze-btn').disabled = true;
+  
+  // Call Apps Script analysis function
+  google.script.run
+    .withSuccessHandler(handleAnalysisSuccess)
+    .withFailureHandler(handleAnalysisFailure)
+    .analyzeActiveSheet();
+}
+
+/**
+ * Handle successful analysis
+ */
+function handleAnalysisSuccess(result) {
+  isAnalyzing = false;
+  currentAnalysis = result;
+  
+  console.log('Analysis result:', result);
+  
+  // Re-enable buttons
+  document.getElementById('analyze-btn').disabled = false;
+  
+  if (result.ok) {
+    // Success case - show loads JSON
+    updateStatus('success', `Analysis complete. ${result.loads.length} loads found.`);
+    addChatMessage('assistant', `Great! Found ${result.loads.length} valid loads. ${result.issues.length > 0 ? result.issues.length + ' warnings found.' : 'No issues detected.'} Here's your normalized JSON:`);
+    
+    displaySuccessResults(result);
+    enableExportButtons();
+  } else {
+    // Issues found - show issues panel
+    if (result.issues.some(issue => issue.code === 'MAPPING_AMBIGUOUS')) {
+      updateStatus('warning', 'Header mapping needs confirmation');
+      addChatMessage('assistant', 'Multiple columns could match the same field. Please confirm the mapping in the dialog.');
+      showMappingDialog(result.issues[0].ambiguities);
+    } else {
+      updateStatus('error', 'Issues found in data');
+      var errorCount = result.issues.filter(i => i.severity === 'error').length;
+      var warningCount = result.issues.filter(i => i.severity === 'warn').length;
+      
+      var message = `Found ${errorCount} error(s) and ${warningCount} warning(s) in your data. `;
+      if (errorCount > 0) {
+        message += 'Fix the errors and re-analyze.';
+      } else {
+        message += 'Warnings don\'t prevent export.';
+      }
+      
+      addChatMessage('assistant', message);
+      displayIssuesResults(result);
+      
+      // Show re-analyze button
+      document.getElementById('reanalyze-btn').style.display = 'block';
+    }
+  }
+  
+  // Switch to Results tab to show results
+  switchTab('results');
+}
+
+/**
+ * Handle analysis failure
+ */
+function handleAnalysisFailure(error) {
+  isAnalyzing = false;
+  updateStatus('error', 'Analysis failed');
+  
+  console.error('Analysis failed:', error);
+  
+  // Re-enable buttons
+  document.getElementById('analyze-btn').disabled = false;
+  
+  addChatMessage('assistant', `Analysis failed: ${error.message || error}. Please check your data and try again.`);
+}
+
+/**
+ * Display success results (loads JSON)
+ */
+function displaySuccessResults(result) {
+  // Hide empty state and issues panel
+  document.getElementById('empty-state').style.display = 'none';
+  document.getElementById('issues-panel').style.display = 'none';
+  
+  // Show success panel
+  document.getElementById('success-panel').style.display = 'block';
+  
+  // Show Re-analyze button
+  document.getElementById('reanalyze-btn').style.display = 'inline-block';
+  
+  // Update loads count
+  document.getElementById('loads-count').textContent = `${result.loads.length} loads validated`;
+  
+  // Display JSON preview
+  var jsonPreview = document.getElementById('json-preview');
+  jsonPreview.innerHTML = `<pre><code>${JSON.stringify(result.loads, null, 2)}</code></pre>`;
+  
+  // Show mapping and meta info
+  displayMapping(result.mapping);
+  displayMeta(result.meta);
+}
+
+/**
+ * Display issues results
+ */
+function displayIssuesResults(result) {
+  // Hide empty state and success panel
+  document.getElementById('empty-state').style.display = 'none';
+  document.getElementById('success-panel').style.display = 'none';
+  
+  // Show issues panel and Re-analyze button
+  document.getElementById('issues-panel').style.display = 'block';
+  document.getElementById('reanalyze-btn').style.display = 'inline-block';
+  
+  var errors = result.issues.filter(i => i.severity === 'error' || i.type === 'error');
+  var warnings = result.issues.filter(i => i.severity === 'warn' || i.type === 'warning');
+  
+  // Display errors
+  if (errors.length > 0) {
+    document.getElementById('error-issues').style.display = 'block';
+    displayIssuesList('error-issues-list', errors);
+  } else {
+    document.getElementById('error-issues').style.display = 'none';
+  }
+  
+  // Display warnings
+  if (warnings.length > 0) {
+    document.getElementById('warning-issues').style.display = 'block';
+    displayIssuesList('warning-issues-list', warnings);
+  } else {
+    document.getElementById('warning-issues').style.display = 'none';
+  }
+  
+  // Display fix hints
+  displayFixHints(result.issues);
+  
+  // Show mapping and meta info
+  displayMapping(result.mapping);
+  displayMeta(result.meta);
+}
+
+/**
+ * Display list of issues
+ */
+function displayIssuesList(containerId, issues) {
+  var container = document.getElementById(containerId);
+  container.innerHTML = '';
+  
+  issues.forEach(function(issue) {
+    var issueDiv = document.createElement('div');
+    issueDiv.className = `issue-item ${issue.severity || issue.type}`;
+    
+    var rowsText = '';
+    if (issue.rows && issue.rows.length > 0) {
+      rowsText = `<span class="issue-rows">Row(s): ${issue.rows.join(', ')}</span>`;
+    } else if (issue.row) {
+      rowsText = `<span class="issue-rows">Row: ${issue.row}</span>`;
+    }
+    
+    var html = `
+      <div class="issue-header">
+        <span class="issue-code">${issue.code}</span>
+        ${rowsText}
+      </div>
+      <div class="issue-message">${issue.message}</div>
+      ${issue.column ? `<div class="issue-column">Column: ${issue.column}</div>` : ''}
+      ${issue.suggestion ? `<div class="issue-suggestion"><strong>Fix:</strong> ${issue.suggestion}</div>` : ''}
+    `;
+    
+    issueDiv.innerHTML = html;
+    container.appendChild(issueDiv);
+  });
+}
+
+/**
+ * Display fix hints
+ */
+function displayFixHints(issues) {
+  var container = document.getElementById('fix-hints-content');
+  container.innerHTML = '';
+  
+  var hints = new Set();
+  
+  issues.forEach(issue => {
+    if (issue.suggestion) {
+      hints.add(issue.suggestion);
+    }
+  });
+  
+  if (hints.size > 0) {
+    var hintsList = document.createElement('ul');
+    hints.forEach(hint => {
+      var li = document.createElement('li');
+      li.textContent = hint;
+      hintsList.appendChild(li);
+    });
+    container.appendChild(hintsList);
+  } else {
+    container.innerHTML = '<p>No specific fix suggestions available.</p>';
+  }
+}
+
+/**
+ * Display header mapping
+ */
+function displayMapping(mapping) {
+  var container = document.getElementById('mapping-list');
+  if (!container) return;
+  
+  container.innerHTML = '';
+  
+  if (Object.keys(mapping).length > 0) {
+    document.getElementById('mapping-display').style.display = 'block';
+    
+    Object.entries(mapping).forEach(([header, field]) => {
+      var mappingDiv = document.createElement('div');
+      mappingDiv.className = 'mapping-item';
+      mappingDiv.innerHTML = `
+        <span class="mapping-header">${header}</span>
+        <span class="mapping-arrow">→</span>
+        <span class="mapping-field">${field}</span>
+      `;
+      container.appendChild(mappingDiv);
+    });
+  } else {
+    document.getElementById('mapping-display').style.display = 'none';
+  }
+}
+
+/**
+ * Display analysis metadata
+ */
+function displayMeta(meta) {
+  if (!meta) return;
+  
+  document.getElementById('meta-rows').textContent = meta.analyzedRows || 0;
+  document.getElementById('meta-timestamp').textContent = meta.analyzedAt ? 
+    new Date(meta.analyzedAt).toLocaleString() : '-';
+  
+  document.getElementById('analysis-meta').style.display = 'block';
+}
+
+/**
+ * Re-analyze function
+ */
+function reAnalyze() {
+  // Clear previous results
+  currentAnalysis = null;
+  document.getElementById('results-content').style.display = 'none';
+  document.getElementById('empty-state').style.display = 'block';
+  document.getElementById('reanalyze-btn').style.display = 'none';
+  
+  // Start fresh analysis
+  addChatMessage('user', 'Re-analyze this tab.');
+  analyzeCurrentTab();
+}
+
+/**
+ * Copy JSON to clipboard
+ */
+function copyJSON() {
+  if (!currentAnalysis || !currentAnalysis.loads) {
+    alert('No valid loads data to copy');
+    return;
+  }
+  
+  var jsonData = {
+    source: 'sheets-addon',
+    version: 1,
+    loads: currentAnalysis.loads
+  };
+  
+  var jsonString = JSON.stringify(jsonData, null, 2);
+  
+  // Copy to clipboard
+  navigator.clipboard.writeText(jsonString).then(() => {
+    alert('JSON copied to clipboard');
+    addChatMessage('assistant', 'JSON data copied to clipboard. Ready to paste into TruckTalk systems.');
+  }).catch(err => {
+    console.error('Failed to copy: ', err);
+    // Fallback method
+    var textarea = document.createElement('textarea');
+    textarea.value = jsonString;
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textarea);
+    
+    alert('JSON copied to clipboard');
+  });
+}
+
+/**
+ * Preview push (no actual API call)
+ */
+function previewPush() {
+  if (!currentAnalysis || !currentAnalysis.loads) {
+    alert('No valid loads data to preview');
+    return;
+  }
+  
+  var payload = {
+    source: 'sheets-addon',
+    version: 1,
+    loads: currentAnalysis.loads
+  };
+  
+  var preview = `Preview Push Payload:\n\n${JSON.stringify(payload, null, 2)}`;
+  
+  addChatMessage('assistant', 'Here\'s a preview of what would be sent to TruckTalk systems:');
+  addChatMessage('assistant', `\`\`\`json\n${JSON.stringify(payload, null, 2)}\n\`\`\``);
+}
+
+/**
+ * Show mapping dialog for ambiguous mappings
+ */
+function showMappingDialog(ambiguities) {
+  var dialog = document.getElementById('mapping-dialog');
+  var optionsContainer = document.getElementById('mapping-options');
+  
+  optionsContainer.innerHTML = '';
+  
+  ambiguities.forEach(ambiguity => {
+    var fieldDiv = document.createElement('div');
+    fieldDiv.className = 'mapping-field-option';
+    
+    var label = document.createElement('label');
+    label.textContent = `Map to ${ambiguity.field}:`;
+    fieldDiv.appendChild(label);
+    
+    var select = document.createElement('select');
+    select.className = 'mapping-select';
+    select.dataset.field = ambiguity.field;
+    
+    // Add "none" option
+    var noneOption = document.createElement('option');
+    noneOption.value = '';
+    noneOption.textContent = '-- Select column --';
+    select.appendChild(noneOption);
+    
+    // Add candidate options
+    ambiguity.candidates.forEach(candidate => {
+      var option = document.createElement('option');
+      option.value = candidate.header;
+      option.textContent = `${candidate.header} (score: ${candidate.score})`;
+      select.appendChild(option);
+    });
+    
+    fieldDiv.appendChild(select);
+    optionsContainer.appendChild(fieldDiv);
+  });
+  
+  dialog.style.display = 'flex';
+}
+
+/**
+ * Close mapping dialog
+ */
+function closeMappingDialog() {
+  document.getElementById('mapping-dialog').style.display = 'none';
+}
+
+/**
+ * Confirm mapping and re-analyze
+ */
+function confirmMapping() {
+  var selects = document.querySelectorAll('.mapping-select');
+  var headerOverrides = {};
+  
+  selects.forEach(select => {
+    if (select.value) {
+      headerOverrides[select.value] = select.dataset.field;
+    }
+  });
+  
+  closeMappingDialog();
+  
+  // Re-analyze with header overrides
+  isAnalyzing = true;
+  updateStatus('analyzing', 'Re-analyzing with confirmed mapping...');
+  
+  google.script.run
+    .withSuccessHandler(handleAnalysisSuccess)
+    .withFailureHandler(handleAnalysisFailure)
+    .analyzeActiveSheet({ headerOverrides: headerOverrides });
+}
+
+/**
+ * Update status display
+ */
+function updateStatus(type, message) {
+  var indicator = document.getElementById('status-indicator');
+  var text = document.getElementById('status-text');
+  
+  // Remove all status classes
+  indicator.className = 'status-' + type;
+  text.textContent = message;
+}
+
+/**
+ * Add message to chat
+ */
+function addChatMessage(type, message, save = true) {
+  var chatMessages = document.getElementById('chat-messages');
+  
+  var messageDiv = document.createElement('div');
+  messageDiv.className = `message ${type}`;
+  
+  var contentDiv = document.createElement('div');
+  contentDiv.className = 'message-content';
+  
+  // Handle markdown-style code blocks
+  if (message.includes('```')) {
+    var parts = message.split('```');
+    var html = '';
+    for (var i = 0; i < parts.length; i++) {
+      if (i % 2 === 0) {
+        html += parts[i].replace(/\n/g, '<br>');
+      } else {
+        html += '<pre><code>' + parts[i] + '</code></pre>';
+      }
+    }
+    contentDiv.innerHTML = html;
+  } else {
+    contentDiv.textContent = message;
+  }
+  
+  messageDiv.appendChild(contentDiv);
+  chatMessages.appendChild(messageDiv);
+  
+  // Save to chat history
+  if (save) {
+    chatHistory.push({
+      type: type,
+      message: message,
+      timestamp: new Date().toISOString()
+    });
+    saveChatHistory();
+  }
+  
+  // Scroll to bottom
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+  
+}
+
+/**
+ * Enable export buttons
+ */
+function enableExportButtons() {
+  document.getElementById('copy-json-btn').disabled = false;
+  document.getElementById('preview-push-btn').disabled = false;
+}
+
+/**
+ * Save chat history to localStorage
+ */
+function saveChatHistory() {
+  try {
+  // Keep only last 50 messages
+  var recentHistory = chatHistory.slice(-50);
+  localStorage.setItem('ttc_chat_history', JSON.stringify(recentHistory));
+  } catch (error) {
+    console.error('Failed to save chat history:', error);
+  }
+}
+
+/**
+ * Load chat history from localStorage
+ */
+function loadChatHistory() {
+  try {
+    var saved = localStorage.getItem('ttc_chat_history');
+    if (saved) {
+      chatHistory = JSON.parse(saved) || [];
+      // Restore recent messages (don't re-save them)
+      var recentMessages = chatHistory.slice(-10); // Last 10 messages
+      recentMessages.forEach(function(msg) {
+        if (msg.type && msg.message) {
+          // render without saving back to storage
+          var chatMessages = document.getElementById('chat-messages');
+          var messageDiv = document.createElement('div');
+          messageDiv.className = `message ${msg.type}`;
+          var contentDiv = document.createElement('div');
+          contentDiv.className = 'message-content';
+          contentDiv.textContent = msg.message;
+          messageDiv.appendChild(contentDiv);
+          chatMessages.appendChild(messageDiv);
+        }
+      });
+    }
+  } catch (error) {
+    console.error('Failed to load chat history:', error);
+    chatHistory = [];
+  }
+}
+
+/**
+ * Save chat history to localStorage
+ */
+function saveChatHistory() {
+  try {
+  // Keep only last 50 messages to prevent storage bloat
+  var trimmedHistory = chatHistory.slice(-50);
+  localStorage.setItem('ttc_chat_history', JSON.stringify(trimmedHistory));
+  } catch (error) {
+    console.error('Error saving chat history:', error);
+  }
+}
+
+/**
+ * Load cached analysis if available
+ */
+function loadCachedAnalysis() {
+  google.script.run
+    .withSuccessHandler(function(result) {
+      if (result) {
+        currentAnalysis = result;
+        if (result.ok) {
+          enableExportButtons();
+        }
+      }
+    })
+    .withFailureHandler(function(error) {
+      console.log('No cached analysis available');
+    })
+    .getCachedAnalysisResult();
+}
+
+/**
+ * Show mapping dialog for ambiguous headers
+ */
+function showMappingDialog(ambiguities) {
+  var dialog = document.getElementById('mapping-dialog');
+  var optionsContainer = document.getElementById('mapping-options');
+  
+  // Clear existing options
+  optionsContainer.innerHTML = '';
+  
+  // Create mapping options for each ambiguous field
+  ambiguities.forEach(function(ambiguity) {
+    var fieldDiv = document.createElement('div');
+    fieldDiv.className = 'mapping-field';
+    
+    var label = document.createElement('label');
+    label.textContent = 'Field: ' + ambiguity.field;
+    fieldDiv.appendChild(label);
+    
+    var select = document.createElement('select');
+    select.className = 'mapping-select';
+    select.dataset.field = ambiguity.field;
+    
+    // Add default option
+    var defaultOption = document.createElement('option');
+    defaultOption.value = '';
+    defaultOption.textContent = 'Select a column...';
+    select.appendChild(defaultOption);
+    
+    // Add candidate options
+    ambiguity.candidates.forEach(function(candidate) {
+      var option = document.createElement('option');
+      option.value = candidate.header;
+      option.textContent = candidate.header + ' (score: ' + candidate.score + ')';
+      select.appendChild(option);
+    });
+    
+    // Auto-select the best match
+    if (ambiguity.candidates.length > 0) {
+      select.value = ambiguity.candidates[0].header;
+    }
+    
+    fieldDiv.appendChild(select);
+    optionsContainer.appendChild(fieldDiv);
+  });
+  
+  dialog.style.display = 'flex';
+}
+
+/**
+ * Close mapping dialog
+ */
+function closeMappingDialog() {
+  document.getElementById('mapping-dialog').style.display = 'none';
+}
+
+/**
+ * Confirm header mapping and re-analyze
+ */
+function confirmMapping() {
+  var selects = document.querySelectorAll('.mapping-select');
+  var headerOverrides = {};
+  
+  selects.forEach(function(select) {
+    if (select.value) {
+      headerOverrides[select.value] = select.dataset.field;
+    }
+  });
+  
+  closeMappingDialog();
+  
+  // Re-analyze with confirmed mapping
+  updateStatus('analyzing', 'Re-analyzing with confirmed mapping...');
+  addChatMessage('user', 'Use the confirmed header mapping.');
+  
+  google.script.run
+    .withSuccessHandler(handleAnalysisSuccess)
+    .withFailureHandler(handleAnalysisFailure)
+    .analyzeActiveSheet({ headerOverrides: headerOverrides });
+}
+
+// Make functions available globally
+window.analyzeCurrentTab = analyzeCurrentTab;
+window.reAnalyze = reAnalyze;
+window.copyJSON = copyJSON;
+window.previewPush = previewPush;
+window.closeMappingDialog = closeMappingDialog;
+window.confirmMapping = confirmMapping;
+
+console.log('TruckTalk Connect UI JavaScript loaded');
+</script>

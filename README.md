@@ -74,6 +74,33 @@ The add-on requires these Google permissions:
 
 These permissions are automatically requested when users first install the add-on.
 
+## ⚡ Latest Enhancements
+
+### Smart Auto-Fix System
+TruckTalk Connect now includes comprehensive auto-fix capabilities:
+- **Date Normalization**: Converts various date formats ("Sep 19, 2025", "20/09/2025") to ISO standard (2025-09-19)
+- **Phone Standardization**: Malaysian phone numbers automatically formatted to +60XXXXXXXXX standard
+- **Status Code Normalization**: Maps common status variations ("pending", "rolling") to standard TruckTalk codes
+- **Missing Data Generation**: Automatically creates unique Load IDs and missing required columns
+- **User Confirmation**: All changes preview before/after values and require explicit approval
+
+### One-Way Sync Integration
+- **Push to TruckTalk Button**: Export validated data to external TruckTalk systems
+- **Mock API Endpoint**: Fully implemented stub for testing (`https://api.trucktalk.com/v1/loads/import`)
+- **Payload Validation**: Ensures data integrity before transmission
+- **Success Simulation**: Complete workflow testing without external dependencies
+
+### Quality Assurance Suite
+- **50+ Unit Tests**: Comprehensive testing for all utility functions (`testAllUtilities()`)
+- **Sample Test Data**: 2 perfect rows + 3 intentionally broken rows for validation testing
+- **Integration Testing**: End-to-end workflow validation
+- **Test Coverage**: Date/time parsing, phone formatting, status mapping, ID generation
+
+### Organization Profiles
+- **Broker Vocabulary Mapping**: Custom normalization rules per user/organization
+- **Persistent Storage**: Settings automatically saved using Google Apps Script PropertiesService
+- **Flexible Configuration**: Adaptable to different company workflows and terminology
+
 ## How to Run
 
 ### For End Users
@@ -84,8 +111,19 @@ These permissions are automatically requested when users first install the add-o
    - View validation errors and warnings
    - See AI-suggested header mappings
    - Review auto-fix recommendations
-5. Apply suggested fixes or make manual corrections
-6. Copy the standardized JSON data for integration with other systems
+5. **NEW**: Use "Auto-Fix Data Issues" to automatically resolve common problems
+6. **NEW**: Test the "Push to TruckTalk" sync functionality
+7. Apply suggested fixes or make manual corrections
+8. Copy the standardized JSON data for integration with other systems
+
+### Testing the New Features
+1. **Auto-Fix Testing**: Use Extensions > TruckTalk Connect > Seed Sample Data to create test scenarios
+2. **Unit Testing**: Run `testAllUtilities()` from the Apps Script editor to verify all functions
+3. **Sample Data**: The seeded data includes 2 perfect rows and 3 broken rows with:
+   - Missing columns (phone, license plate)
+   - Bad date formats ("Sep 19, 2025", "20/09/2025")
+   - Duplicate Load IDs
+   - Non-standard time formats ("2:45 PM")
 
 ### For Developers
 1. **API Development**: Use `npm run dev` to run the Vercel API locally

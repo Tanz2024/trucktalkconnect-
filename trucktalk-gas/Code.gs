@@ -4274,7 +4274,7 @@ function analyzeActiveSheet(options = {}) {
 function callTruckTalkAIAPI(payload, requestId) {
   try {
     // Production API endpoint
-    const API_ENDPOINT = 'https://trucktalkconnect-awaayixg7-tanzs-projects-ccb5cdb8.vercel.app/api/ai';
+    const API_ENDPOINT = 'https://trucktalkconnect-4tlu1n3g5-tanzs-projects-ccb5cdb8.vercel.app/api/ai';
     
     // Get configuration from Script Properties
     const properties = PropertiesService.getScriptProperties();
@@ -4284,34 +4284,10 @@ function callTruckTalkAIAPI(payload, requestId) {
     const endpoint = customEndpoint || API_ENDPOINT;
     
     Logger.log(`[${requestId}] Calling API: ${endpoint}`);
+    Logger.log(`[${requestId}] HMAC authentication disabled - using simple API call`);
     
-    // Check HMAC configuration
-    if (!hmacSecret) {
-      Logger.log(`[${requestId}] WARNING: HMAC secret not configured - API may reject request`);
-      Logger.log(`[${requestId}] Run setupTruckTalkConfig() to configure HMAC authentication`);
-    }
-    
-    // Prepare request with stable JSON serialization for HMAC
-    const timestamp = String(Date.now());
-    const bodyString = stableStringify(payload);
-    
-    // Calculate HMAC signature if secret is configured
-    let signature = null;
-    if (hmacSecret) {
-      try {
-        const signatureData = `${timestamp}.${bodyString}`;
-        const macBytes = Utilities.computeHmacSha256Signature(signatureData, hmacSecret);
-        signature = macBytes.map(function(b) {
-          const v = (b < 0) ? b + 256 : b;
-          const s = v.toString(16);
-          return s.length === 1 ? '0' + s : s;
-        }).join('');
-        Logger.log(`[${requestId}] HMAC signature generated`);
-      } catch (hmacError) {
-        Logger.log(`[${requestId}] HMAC generation failed: ${hmacError.toString()}`);
-        // Continue without HMAC if generation fails
-      }
-    }
+    // Prepare request payload (simplified - no HMAC needed)
+    const bodyString = JSON.stringify(payload);
     
     // Prepare headers following API specification
     const headers = {
@@ -4319,11 +4295,6 @@ function callTruckTalkAIAPI(payload, requestId) {
       'Origin': 'https://script.google.com',
       'User-Agent': 'TruckTalk-Connect-GAS/1.0'
     };
-    
-    if (hmacSecret && signature) {
-      headers['x-ttc-timestamp'] = timestamp;
-      headers['x-ttc-signature'] = signature;
-    }
     
     // Make API request with comprehensive error handling
     const options = {
@@ -4384,10 +4355,8 @@ function callTruckTalkAIAPI(payload, requestId) {
       // Authentication failed
       return { 
         success: false, 
-        error: 'Authentication failed. Invalid or missing HMAC signature.',
-        suggestion: hmacSecret ? 
-          'HMAC signature invalid. Check if the secret key is correct.' :
-          'HMAC secret not configured. Run setupTruckTalkConfig() to set up authentication.'
+        error: 'Authentication failed. API access denied.',
+        suggestion: 'Check API configuration and try again.'
       };
     } else {
       // Other errors
@@ -4417,36 +4386,6 @@ function callTruckTalkAIAPI(payload, requestId) {
       suggestion: 'Check your internet connection and try again'
     };
   }
-}
-
-/**
- * Stable JSON stringification for consistent HMAC computation
- * Matches the server-side implementation for signature validation
- */
-function stableStringify(obj) {
-  const seen = new WeakMap();
-  
-  function helper(x) {
-    if (x && typeof x === 'object') {
-      if (seen.has(x)) {
-        throw new Error('Circular reference detected in object');
-      }
-      seen.set(x, true);
-      
-      if (Array.isArray(x)) {
-        return x.map(helper);
-      }
-      
-      const sorted = {};
-      Object.keys(x).sort().forEach(k => {
-        sorted[k] = helper(x[k]);
-      });
-      return sorted;
-    }
-    return x;
-  }
-  
-  return JSON.stringify(helper(obj));
 }
 
 /**

@@ -1,0 +1,8 @@
+﻿  // Clear existing AI sections to prevent duplicates during reanalysis
+  console.log('Clearing existing AI analysis sections...');
+  var existingSections = document.querySelectorAll('.ai-analysis-section, .ai-changes-section, .ai-autofixes-section');
+  existingSections.forEach(section => {
+    console.log('Removing existing AI section');
+    section.remove();
+  });
+  console.log('Cleared ' + existingSections.length + ' existing AI sections');

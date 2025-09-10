@@ -1,4 +1,4 @@
-<script>
+﻿<script>
 // =============================================================================
 // TruckTalk Connect - UI JavaScript
 // Following exact UX flow specification
@@ -315,7 +315,7 @@ function focusTabContent(tabName) {
  * Track tab switches for analytics/debugging
  */
 function trackTabSwitch(from, to, reason) {
-  console.log(`Tab switch: ${from || 'none'} → ${to} (${reason})`);
+  console.log(`Tab switch: ${from || 'none'} â†’ ${to} (${reason})`);
   
   // Could send to analytics service in production
   // analytics.track('tab_switched', { from, to, reason, timestamp: Date.now() });
@@ -483,9 +483,9 @@ function showKeyboardShortcutsHint() {
   if (!hasSeenHint) {
     setTimeout(() => {
       const shortcutsMessage = `**Pro Tips:**\n\n` +
-        `• **Ctrl+1** / **Ctrl+2** - Switch between Chat and Results tabs\n` +
-        `• **Alt+←** / **Alt+→** - Navigate between tabs\n` +
-        `• Tab automatically switches to Results when analysis completes\n\n` +
+        `â€¢ **Ctrl+1** / **Ctrl+2** - Switch between Chat and Results tabs\n` +
+        `â€¢ **Alt+â†** / **Alt+â†’** - Navigate between tabs\n` +
+        `â€¢ Tab automatically switches to Results when analysis completes\n\n` +
         `Ready to analyze your spreadsheet data!`;
       
       addChatMessage('assistant', shortcutsMessage);
@@ -575,19 +575,19 @@ function handleAnalysisSuccess(result) {
       
       if (result.meta.confidence) {
         var confidencePercent = Math.round(result.meta.confidence * 100);
-        chatMessage += `\n• Overall Confidence: ${confidencePercent}%`;
+        chatMessage += `\nâ€¢ Overall Confidence: ${confidencePercent}%`;
       }
       
       if (result.aiMappings && result.aiMappings.length > 0) {
-        chatMessage += `\n• Auto-mapped ${result.aiMappings.length} columns with semantic analysis`;
+        chatMessage += `\nâ€¢ Auto-mapped ${result.aiMappings.length} columns with semantic analysis`;
       }
       
       if (result.aiChanges && result.aiChanges.length > 0) {
-        chatMessage += `\n• Made ${result.aiChanges.length} data transformations`;
+        chatMessage += `\nâ€¢ Made ${result.aiChanges.length} data transformations`;
       }
       
       if (result.aiAutoFixes && result.aiAutoFixes.length > 0) {
-        chatMessage += `\n• Found ${result.aiAutoFixes.length} auto-fix suggestions (see Results tab)`;
+        chatMessage += `\nâ€¢ Found ${result.aiAutoFixes.length} auto-fix suggestions (see Results tab)`;
       }
       
       if (result.aiResponse && result.aiResponse.aiExplanation) {
@@ -711,6 +711,15 @@ function syntaxHighlightJSON(json) {
  */
 function displaySuccessInIssuesPanel(result) {
   console.log('displaySuccessInIssuesPanel called with result:', result);
+
+  // Clear existing AI sections to prevent duplicates during reanalysis
+  console.log('Clearing existing AI analysis sections...');
+  var existingSections = document.querySelectorAll('.ai-analysis-section, .ai-changes-section, .ai-autofixes-section');
+  existingSections.forEach(section => {
+    console.log('Removing existing AI section');
+    section.remove();
+  });
+  console.log('Cleared ' + existingSections.length + ' existing AI sections');
   
   // Hide empty state and success panel
   const emptyState = document.getElementById('empty-state');
@@ -880,14 +889,14 @@ function displaySuccessInIssuesPanel(result) {
             <pre><code style="color: #dc2626;">No valid loads found in the data.
         
 Please check:
-• Spreadsheet has data rows
-• Headers are properly mapped  
-• Required fields are present
+â€¢ Spreadsheet has data rows
+â€¢ Headers are properly mapped  
+â€¢ Required fields are present
 
 Debug info:
-• result.loads: ${result.loads ? 'exists' : 'null/undefined'}
-• loads length: ${result.loads ? result.loads.length : 'N/A'}
-• loads sample: ${result.loads && result.loads.length > 0 ? JSON.stringify(result.loads[0], null, 2) : 'No data'}</code></pre>
+â€¢ result.loads: ${result.loads ? 'exists' : 'null/undefined'}
+â€¢ loads length: ${result.loads ? result.loads.length : 'N/A'}
+â€¢ loads sample: ${result.loads && result.loads.length > 0 ? JSON.stringify(result.loads[0], null, 2) : 'No data'}</code></pre>
           </div>
         </div>`;
       
@@ -1089,6 +1098,17 @@ function displayAIAnalysisSection(result) {
   if (!result.meta || result.meta.service !== 'AI-Powered') {
     return;
   }
+
+  // Clear existing AI sections to prevent duplicates
+  console.log('Clearing existing AI sections before creating new one...');
+  var existingSections = document.querySelectorAll('.ai-analysis-section, .ai-changes-section, .ai-autofixes-section');
+  existingSections.forEach(section => {
+    console.log('Removing existing AI section');
+    section.remove();
+  });
+  console.log('Cleared ' + existingSections.length + ' existing AI sections');
+    return;
+  }
   
   var aiSectionHtml = '<div class="ai-analysis-section" style="margin: 15px 0; padding: 15px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #007bff;">';
   aiSectionHtml += '<h4 style="margin: 0 0 10px 0; color: #007bff;">AI Analysis Results</h4>';
@@ -1112,7 +1132,7 @@ function displayAIAnalysisSection(result) {
     result.aiMappings.forEach(mapping => {
       var confidencePercent = Math.round(mapping.confidence * 100);
       var confidenceColor = confidencePercent >= 90 ? '#28a745' : confidencePercent >= 60 ? '#ffc107' : '#dc3545';
-      aiSectionHtml += `<li><code>${mapping.header}</code> → <code>${mapping.field}</code> <span style="color: ${confidenceColor};">(${confidencePercent}%)</span>`;
+      aiSectionHtml += `<li><code>${mapping.header}</code> â†’ <code>${mapping.field}</code> <span style="color: ${confidenceColor};">(${confidencePercent}%)</span>`;
       if (mapping.alternatives && mapping.alternatives.length > 0) {
         aiSectionHtml += ` <em>alternatives: ${mapping.alternatives.join(', ')}</em>`;
       }
@@ -1127,7 +1147,7 @@ function displayAIAnalysisSection(result) {
     aiSectionHtml += '<ul style="margin: 5px 0 10px 20px;">';
     result.aiChanges.forEach((change, index) => {
       if (index < 5) { // Limit to first 5 changes
-        aiSectionHtml += `<li><strong>${change.field}:</strong> "${change.from}" → "${change.to}" <em>(${change.reason})</em></li>`;
+        aiSectionHtml += `<li><strong>${change.field}:</strong> "${change.from}" â†’ "${change.to}" <em>(${change.reason})</em></li>`;
       }
     });
     if (result.aiChanges.length > 5) {
@@ -1143,7 +1163,7 @@ function displayAIAnalysisSection(result) {
     result.aiAutoFixes.forEach((fix, index) => {
       aiSectionHtml += `<div style="background: white; padding: 10px; margin: 5px 0; border-radius: 5px; border: 1px solid #dee2e6;">`;
       aiSectionHtml += `<div><strong>${fix.description}</strong></div>`;
-      aiSectionHtml += `<div style="color: #6c757d; font-size: 0.9em;">Field: ${fix.field} • Affects ${fix.rowsAffected} rows</div>`;
+      aiSectionHtml += `<div style="color: #6c757d; font-size: 0.9em;">Field: ${fix.field} â€¢ Affects ${fix.rowsAffected} rows</div>`;
       aiSectionHtml += `<div style="color: #6c757d; font-size: 0.9em; margin-top: 5px;">Preview: ${fix.preview}</div>`;
       if (fix.rule) {
         aiSectionHtml += `<div style="color: #6c757d; font-size: 0.8em; margin-top: 5px;">Rule: ${fix.rule}</div>`;
@@ -1182,16 +1202,16 @@ function applyAIAutoFixes() {
   // Call Google Apps Script to apply fixes
   google.script.run
     .withSuccessHandler(function(result) {
-      addChatMessage('assistant', '✅ AI auto-fixes applied successfully! Re-analyzing data...');
+      addChatMessage('assistant', 'âœ… AI auto-fixes applied successfully! Re-analyzing data...');
       if (button) {
-        button.textContent = 'Fixes Applied ✅';
+        button.textContent = 'Fixes Applied âœ…';
       }
       // Re-analyze after applying fixes
       setTimeout(() => performAnalysis(), 1000);
     })
     .withFailureHandler(function(error) {
       console.error('Failed to apply AI fixes:', error);
-      addChatMessage('assistant', '❌ Failed to apply auto-fixes: ' + error.message);
+      addChatMessage('assistant', 'âŒ Failed to apply auto-fixes: ' + error.message);
       if (button) {
         button.disabled = false;
         button.textContent = 'Apply AI Auto-Fixes';
@@ -1266,7 +1286,7 @@ function displayFixHints(issues) {
  */
 function displayChangesSection(changes) {
   var changesHtml = '<div class="ai-changes-section" style="margin: 16px 0; padding: 12px; border: 1px solid #e5e7eb; border-radius: 6px; background: #f8f9fa;">';
-  changesHtml += '<h4 style="margin: 0 0 8px 0; color: #333; font-size: 14px;">🔄 AI Changes Made</h4>';
+  changesHtml += '<h4 style="margin: 0 0 8px 0; color: #333; font-size: 14px;">ðŸ”„ AI Changes Made</h4>';
   
   changes.forEach(function(change, index) {
     var changeColor = change.type === 'mapping' ? '#3b82f6' : change.type === 'data' ? '#10b981' : '#f59e0b';
@@ -1275,7 +1295,7 @@ function displayChangesSection(changes) {
     changesHtml += '<div style="font-weight: 500; color: #374151; margin-bottom: 4px;">' + change.field + ' (' + change.type + ')</div>';
     changesHtml += '<div style="font-size: 12px; color: #6b7280; display: flex; align-items: center; gap: 8px;">';
     changesHtml += '<span style="padding: 2px 6px; background: #fef2f2; color: #dc2626; border-radius: 3px;">From: ' + change.from + '</span>';
-    changesHtml += '<span>→</span>';
+    changesHtml += '<span>â†’</span>';
     changesHtml += '<span style="padding: 2px 6px; background: #f0fdf4; color: #16a34a; border-radius: 3px;">To: ' + change.to + '</span>';
     changesHtml += '</div>';
     if (change.reason) {
@@ -1299,7 +1319,7 @@ function displayChangesSection(changes) {
 function displayAutoFixesSection(autoFixes) {
   var fixesHtml = '<div class="ai-autofixes-section" style="margin: 16px 0; padding: 12px; border: 1px solid #e5e7eb; border-radius: 6px; background: #f0fdf4;">';
   fixesHtml += '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">';
-  fixesHtml += '<h4 style="margin: 0; color: #333; font-size: 14px;">🔧 AI Auto-Fix Suggestions</h4>';
+  fixesHtml += '<h4 style="margin: 0; color: #333; font-size: 14px;">ðŸ”§ AI Auto-Fix Suggestions</h4>';
   fixesHtml += '<button onclick="applyAutoFixes()" style="padding: 4px 8px; background: #10b981; color: white; border: none; border-radius: 4px; font-size: 12px; cursor: pointer;">Apply All Fixes</button>';
   fixesHtml += '</div>';
   
@@ -1342,7 +1362,7 @@ function displayMapping(mapping, meta) {
       aiIndicator.className = 'ai-mapping-indicator';
       aiIndicator.innerHTML = `
         <div class="ai-badge">
-          <i class="ai-icon">🤖</i>
+          <i class="ai-icon">ðŸ¤–</i>
           AI-Generated Mapping
         </div>
         <div class="ai-description">Column mapping automatically detected by AI analysis</div>
@@ -1358,7 +1378,7 @@ function displayMapping(mapping, meta) {
       }
       mappingDiv.innerHTML = `
         <span class="mapping-header">${header}</span>
-        <span class="mapping-arrow">→</span>
+        <span class="mapping-arrow">â†’</span>
         <span class="mapping-field">${field}</span>
       `;
       container.appendChild(mappingDiv);
@@ -1462,7 +1482,7 @@ function showBasicFixSummary(result) {
   var basicSummaryHtml = `
     <div class="fix-results-panel">
       <div class="fix-results-header">
-        <h3>🤖 AI Auto-Fix Summary</h3>
+        <h3>ðŸ¤– AI Auto-Fix Summary</h3>
         <div class="fix-stats">${result.fixes.length} fixes applied</div>
       </div>
       <div class="fix-changes-list">
@@ -1474,7 +1494,7 @@ function showBasicFixSummary(result) {
     basicSummaryHtml += `
       <div class="fix-item">
         <div class="fix-change">
-          <div class="fix-description">✅ ${fix}</div>
+          <div class="fix-description">âœ… ${fix}</div>
         </div>
       </div>`;
   });
@@ -1485,7 +1505,7 @@ function showBasicFixSummary(result) {
       </div>
       <div class="fix-results-footer">
         <div class="fix-note">
-          <span class="fix-icon">ℹ️</span>
+          <span class="fix-icon">â„¹ï¸</span>
           Changes have been applied to your spreadsheet. Re-analyzing will show updated validation results.
         </div>
       </div>
@@ -1516,7 +1536,7 @@ function showFixResults(result) {
   var fixResultsHtml = `
     <div class="fix-results-panel">
       <div class="fix-results-header">
-        <h3>🤖 AI Auto-Fix Results</h3>
+        <h3>ðŸ¤– AI Auto-Fix Results</h3>
         <div class="fix-stats">
           <span class="fix-count">${result.detailedFixes.length} changes applied</span>
         </div>
@@ -1536,13 +1556,13 @@ function showFixResults(result) {
     // Display each fix type
     Object.keys(fixesByType).forEach(type => {
       var typeLabel = {
-        'COLUMN_CREATED': '📋 Columns Created',
-        'DATE_NORMALIZED': '📅 Dates Normalized', 
-        'LOAD_ID_GENERATED': '🔢 Load IDs Generated',
-        'DUPLICATE_RESOLVED': '🔄 Duplicates Resolved',
-        'STATUS_NORMALIZED': '📊 Status Values Normalized',
-        'EMPTY_CELL_FILLED': '✏️ Empty Cells Filled'
-      }[type] || `🔧 ${type.replace(/_/g, ' ')}`;    fixResultsHtml += `
+        'COLUMN_CREATED': 'ðŸ“‹ Columns Created',
+        'DATE_NORMALIZED': 'ðŸ“… Dates Normalized', 
+        'LOAD_ID_GENERATED': 'ðŸ”¢ Load IDs Generated',
+        'DUPLICATE_RESOLVED': 'ðŸ”„ Duplicates Resolved',
+        'STATUS_NORMALIZED': 'ðŸ“Š Status Values Normalized',
+        'EMPTY_CELL_FILLED': 'âœï¸ Empty Cells Filled'
+      }[type] || `ðŸ”§ ${type.replace(/_/g, ' ')}`;    fixResultsHtml += `
       <div class="fix-type-section">
         <h4 class="fix-type-title">${typeLabel}</h4>
         <div class="fix-items">`;
@@ -1556,7 +1576,7 @@ function showFixResults(result) {
               <span class="fix-label">Before:</span>
               <code class="fix-value before">${fix.before}</code>
             </div>
-            <div class="fix-arrow">→</div>
+            <div class="fix-arrow">â†’</div>
             <div class="fix-after">
               <span class="fix-label">After:</span>
               <code class="fix-value after">${fix.after}</code>
@@ -1576,7 +1596,7 @@ function showFixResults(result) {
       
       <div class="fix-results-footer">
         <div class="fix-note">
-          <span class="fix-icon">ℹ️</span>
+          <span class="fix-icon">â„¹ï¸</span>
           Changes have been applied to your spreadsheet. Re-analyzing will show updated validation results.
         </div>
       </div>
@@ -1595,7 +1615,7 @@ function showFixResults(result) {
 }
 
 /**
- * Start AI Auto-Fix process - Unified function following the flow: Analyze → Issues → Fix → JSON
+ * Start AI Auto-Fix process - Unified function following the flow: Analyze â†’ Issues â†’ Fix â†’ JSON
  */
 function startAIAutoFix() {
   console.log('=== AI AUTO-FIX STARTED ===');
@@ -1628,11 +1648,11 @@ function applyAIGeneratedFixes(autoFixes) {
   var confirmMessage = `AI has ${autoFixes.length} auto-fix suggestion(s):\n\n`;
   autoFixes.forEach((fix, index) => {
     if (index < 3) { // Show first 3 fixes
-      confirmMessage += `• ${fix.description}\n`;
+      confirmMessage += `â€¢ ${fix.description}\n`;
     }
   });
   if (autoFixes.length > 3) {
-    confirmMessage += `• ... and ${autoFixes.length - 3} more fixes\n`;
+    confirmMessage += `â€¢ ... and ${autoFixes.length - 3} more fixes\n`;
   }
   confirmMessage += '\nApply these AI fixes?';
   
@@ -1643,27 +1663,27 @@ function applyAIGeneratedFixes(autoFixes) {
   // Start auto-fix process
   var autoFixBtn = document.getElementById('ai-autofix-btn');
   if (autoFixBtn) {
-    autoFixBtn.textContent = '🤖 Applying AI Fixes...';
+    autoFixBtn.textContent = 'ðŸ¤– Applying AI Fixes...';
     autoFixBtn.disabled = true;
   }
   
-  addChatMessage('assistant', '🤖 Applying AI auto-fixes to your spreadsheet...');
+  addChatMessage('assistant', 'ðŸ¤– Applying AI auto-fixes to your spreadsheet...');
   
   // Call Google Apps Script to apply fixes
   google.script.run
     .withSuccessHandler(function(result) {
       if (result.success) {
-        addChatMessage('assistant', `✅ AI fixes applied successfully! ${result.message}`);
-        addChatMessage('assistant', '🔄 Re-analyzing data to generate updated JSON...');
+        addChatMessage('assistant', `âœ… AI fixes applied successfully! ${result.message}`);
+        addChatMessage('assistant', 'ðŸ”„ Re-analyzing data to generate updated JSON...');
         setTimeout(() => performAnalysis(), 1000);
       } else {
-        addChatMessage('assistant', '❌ Failed to apply AI fixes: ' + result.error);
+        addChatMessage('assistant', 'âŒ Failed to apply AI fixes: ' + result.error);
         resetAutoFixButton();
       }
     })
     .withFailureHandler(function(error) {
       console.error('Failed to apply AI fixes:', error);
-      addChatMessage('assistant', '❌ Auto-fix failed: ' + error.message);
+      addChatMessage('assistant', 'âŒ Auto-fix failed: ' + error.message);
       resetAutoFixButton();
     })
     .applyAIAutoFixes(autoFixes);
@@ -1689,7 +1709,7 @@ function applyManualIssueFixes() {
   // Show confirmation dialog
   var confirmMessage = `AI will attempt to fix ${fixableErrors.length} error(s):\n\n`;
   fixableErrors.forEach(error => {
-    confirmMessage += `• ${error.message}\n`;
+    confirmMessage += `â€¢ ${error.message}\n`;
   });
   confirmMessage += '\nProceed with AI auto-fix?';
   
@@ -1700,10 +1720,10 @@ function applyManualIssueFixes() {
   // Start auto-fix process
   var autoFixBtn = document.getElementById('ai-autofix-btn');
   var originalText = autoFixBtn.textContent;
-  autoFixBtn.textContent = '🤖 AI is fixing errors...';
+  autoFixBtn.textContent = 'ðŸ¤– AI is fixing errors...';
   autoFixBtn.disabled = true;
   
-  addChatMessage('assistant', '🤖 Starting AI auto-fix process...');
+  addChatMessage('assistant', 'ðŸ¤– Starting AI auto-fix process...');
   
   // Call backend AI auto-fix function
   google.script.run
@@ -1713,27 +1733,27 @@ function applyManualIssueFixes() {
       
       if (result.success) {
         // Show concise fix summary in chat
-        var fixSummary = `✅ **AI Auto-Fix Complete!**\n\n`;
+        var fixSummary = `âœ… **AI Auto-Fix Complete!**\n\n`;
         fixSummary += `Applied **${result.fixes.length} fix(es)**:\n`;
         result.fixes.forEach(fix => {
-          fixSummary += `• ${fix}\n`;
+          fixSummary += `â€¢ ${fix}\n`;
         });
         
         // Show sample of detailed changes if available
         if (result.detailedFixes && result.detailedFixes.length > 0) {
           fixSummary += `\n**Sample Changes:**\n`;
           result.detailedFixes.slice(0, 3).forEach(fix => {
-            fixSummary += `• **${fix.location}**: \`${fix.before}\` → \`${fix.after}\`\n`;
+            fixSummary += `â€¢ **${fix.location}**: \`${fix.before}\` â†’ \`${fix.after}\`\n`;
           });
           
           if (result.detailedFixes.length > 3) {
-            fixSummary += `• ... and ${result.detailedFixes.length - 3} more changes\n`;
+            fixSummary += `â€¢ ... and ${result.detailedFixes.length - 3} more changes\n`;
           }
           
-          fixSummary += `\n📋 **View complete fix details in the Results tab**`;
+          fixSummary += `\nðŸ“‹ **View complete fix details in the Results tab**`;
         }
         
-        fixSummary += `\n\n🔄 Re-analyzing your data to show updated results...`;
+        fixSummary += `\n\nðŸ”„ Re-analyzing your data to show updated results...`;
         
         addChatMessage('assistant', fixSummary);
         
@@ -1753,13 +1773,13 @@ function applyManualIssueFixes() {
           analyzeCurrentTab();
         }, 2000);
       } else {
-        addChatMessage('assistant', `❌ AI auto-fix failed: ${result.error}`);
+        addChatMessage('assistant', `âŒ AI auto-fix failed: ${result.error}`);
       }
     })
     .withFailureHandler(function(error) {
       autoFixBtn.textContent = originalText;
       autoFixBtn.disabled = false;
-      addChatMessage('assistant', `❌ Auto-fix error: ${error.message}`);
+      addChatMessage('assistant', `âŒ Auto-fix error: ${error.message}`);
     })
     .autoFixDataIssues({ source: 'ai-autofix' });
 }
@@ -1794,7 +1814,7 @@ function copyJSON() {
   console.log('JSON to copy:', jsonString.substring(0, 200) + '...');
   
   // Show preview in chat before copying
-  addChatMessage('assistant', `📋 **JSON Data Ready** (${loadsJson.length} loads)\n\`\`\`json\n${jsonString}\n\`\`\``);
+  addChatMessage('assistant', `ðŸ“‹ **JSON Data Ready** (${loadsJson.length} loads)\n\`\`\`json\n${jsonString}\n\`\`\``);
   
   // Try modern clipboard API first
   if (navigator.clipboard && window.isSecureContext) {
@@ -1842,15 +1862,15 @@ function fallbackCopy(jsonString, totalLoads) {
  */
 function showCopySuccess(totalLoads) {
   updateStatus('success', `JSON copied! ${totalLoads} loads ready for import.`);
-  addChatMessage('assistant', `✅ JSON data copied to clipboard! Contains ${totalLoads} validated loads ready for TruckTalk import.`);
+  addChatMessage('assistant', `âœ… JSON data copied to clipboard! Contains ${totalLoads} validated loads ready for TruckTalk import.`);
   
   // Briefly highlight the copy button
   var btn = document.getElementById('copy-json-btn');
   if (btn) {
-    btn.textContent = '✓ Copied!';
+    btn.textContent = 'âœ“ Copied!';
     btn.classList.add('btn-success');
     setTimeout(() => {
-      btn.innerHTML = '<span class="btn-icon">📋</span> Copy JSON';
+      btn.innerHTML = '<span class="btn-icon">ðŸ“‹</span> Copy JSON';
       btn.classList.remove('btn-success');
     }, 2000);
   }
@@ -1861,7 +1881,7 @@ function showCopySuccess(totalLoads) {
  */
 function showCopyError() {
   updateStatus('error', 'Failed to copy JSON to clipboard');
-  addChatMessage('assistant', '❌ Failed to copy JSON to clipboard. Please try again or copy manually from the preview.');
+  addChatMessage('assistant', 'âŒ Failed to copy JSON to clipboard. Please try again or copy manually from the preview.');
 }
 
 /**
@@ -1899,7 +1919,7 @@ function previewPush() {
   
   // Show preview in chat as well
   var previewJson = JSON.stringify(payload, null, 2);
-  addChatMessage('assistant', `� **TruckTalk Push Payload Preview** (${payload.loads.length} loads)\n\`\`\`json\n${previewJson}\n\`\`\``);
+  addChatMessage('assistant', `ï¿½ **TruckTalk Push Payload Preview** (${payload.loads.length} loads)\n\`\`\`json\n${previewJson}\n\`\`\``);
 }
 
 /**
@@ -1945,10 +1965,10 @@ function showPreviewModal(payload) {
     <div style="margin-bottom: 15px;">
       <button onclick="navigator.clipboard.writeText(this.nextElementSibling.textContent).then(() => alert('Push payload copied to clipboard!'))" 
               style="background: #2563eb; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; margin-right: 10px;">
-        📋 Copy Push Payload
+        ðŸ“‹ Copy Push Payload
       </button>
       <span style="color: #666; font-size: 14px;">
-        TruckTalk API format • Ready for integration
+        TruckTalk API format â€¢ Ready for integration
       </span>
     </div>
     <pre style="background: #f8f9fa; padding: 15px; border-radius: 4px; overflow: auto; max-height: 400px; font-size: 12px; border: 1px solid #e9ecef;">${jsonString}</pre>
@@ -2005,15 +2025,15 @@ function pushToTruckTalk() {
       pushBtn.disabled = false;
       
       if (result.success) {
-        addChatMessage('assistant', `✅ Successfully pushed ${result.pushedLoads} loads to TruckTalk platform!`);
+        addChatMessage('assistant', `âœ… Successfully pushed ${result.pushedLoads} loads to TruckTalk platform!`);
       } else {
-        addChatMessage('assistant', `❌ Failed to push data: ${result.error}`);
+        addChatMessage('assistant', `âŒ Failed to push data: ${result.error}`);
       }
     })
     .withFailureHandler(function(error) {
       pushBtn.textContent = originalText;
       pushBtn.disabled = false;
-      addChatMessage('assistant', `❌ Error pushing to TruckTalk: ${error.message}`);
+      addChatMessage('assistant', `âŒ Error pushing to TruckTalk: ${error.message}`);
     })
     .pushToTruckTalk(payload);
 }
@@ -2230,3 +2250,6 @@ window.testJSONDisplay = testJSONDisplay;
 
 console.log('TruckTalk Connect UI JavaScript loaded');
 </script>
+/ /   T e s t   c o m m e n t   t o   v e r i f y   f i l e   e d i t i n g 
+ 
+ 

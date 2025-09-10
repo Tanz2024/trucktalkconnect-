@@ -62,7 +62,7 @@
                         Analyze current tab
                     </button>
                     
-                    <button id="copy-json-btn" class="btn btn-success" onclick="copyJSON()" disabled>
+                    <button id="copy-json-btn-chat" class="btn btn-success" onclick="copyJSON()" disabled>
                         <span class="btn-icon"></span>
                         Copy JSON
                     </button>
@@ -100,6 +100,31 @@
                             <h3 id="issues-panel-title">Analysis Results</h3>
                         </div>
                         
+                        <!-- Analysis Flow Progress -->
+                        <div id="analysis-flow" style="display: none;">
+                            <div class="flow-steps">
+                                <div class="flow-step completed" id="step-analyze">
+                                    <span class="step-icon">✅</span>
+                                    <span class="step-text">Analyze</span>
+                                </div>
+                                <div class="flow-arrow">→</div>
+                                <div class="flow-step" id="step-issues">
+                                    <span class="step-icon">📋</span>
+                                    <span class="step-text">Issues</span>
+                                </div>
+                                <div class="flow-arrow">→</div>
+                                <div class="flow-step" id="step-fix">
+                                    <span class="step-icon">🔧</span>
+                                    <span class="step-text">Fix</span>
+                                </div>
+                                <div class="flow-arrow">→</div>
+                                <div class="flow-step" id="step-json">
+                                    <span class="step-icon">📄</span>
+                                    <span class="step-text">JSON</span>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Success JSON Display (shown when no errors) -->
                         <div id="success-json-section" style="display: none;">
                             <h4 id="success-section-title" class="issue-section-title success">📄 Structured Data Ready</h4>
@@ -157,7 +182,7 @@
                         
                         <!-- Action Buttons -->
                         <div class="action-buttons">
-                            <button id="copy-json-btn" class="btn btn-primary" onclick="copyJSON()" disabled>
+                            <button id="copy-json-btn-results" class="btn btn-primary" onclick="copyJSON()" disabled>
                                 Copy JSON
                             </button>
                             <button id="preview-push-btn" class="btn btn-outline" onclick="previewPush()" disabled>

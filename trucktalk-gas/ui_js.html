@@ -681,6 +681,13 @@ function displaySuccessInIssuesPanel(result) {
     return;
   }
   
+  // Show and update analysis flow
+  const analysisFlow = document.getElementById('analysis-flow');
+  if (analysisFlow) {
+    analysisFlow.style.display = 'block';
+    updateAnalysisFlow('json', result);
+  }
+  
   if (issuesPanelTitle) {
     // Update title based on whether it's AI-powered or not
     if (result.meta && result.meta.service === 'AI-Powered') {
@@ -735,80 +742,8 @@ function displaySuccessInIssuesPanel(result) {
     sampleLoad: result.loads && result.loads.length > 0 ? result.loads[0] : null
   });
   
-  // Display JSON directly in the issues panel with copy button
-  var jsonPreviewInline = document.getElementById('json-preview-inline');
-  if (jsonPreviewInline && result.loads && result.loads.length > 0) {
-    try {
-      var jsonString = JSON.stringify(result.loads, null, 2);
-      var highlightedJson = syntaxHighlightJSON(jsonString);
-      
-      // Create the JSON display with integrated copy button
-      jsonPreviewInline.innerHTML = `
-        <div class="json-container">
-          <div class="json-header">
-            <span class="json-title">JSON Data (${result.loads.length} loads)</span>
-            <button class="btn btn-sm btn-success copy-json-inline" onclick="copyJSON()" title="Copy JSON to clipboard">
-              📋 Copy JSON
-            </button>
-          </div>
-          <div class="json-content">
-            <pre><code>${highlightedJson}</code></pre>
-          </div>
-        </div>`;
-      console.log('JSON displayed successfully with copy button, length:', jsonString.length);
-      
-      // Check if the JSON contains mostly empty values (debugging)
-      var emptyValueCount = (jsonString.match(/:\s*""/g) || []).length;
-      if (emptyValueCount > 5) {
-        console.warn('Warning: JSON contains many empty values, this might indicate data extraction issues');
-        // Also add debug info to the display
-        var debugInfo = document.createElement('div');
-        debugInfo.className = 'json-debug-info';
-        debugInfo.innerHTML = `<small style="color: #f59e0b;">⚠️ Debug: Found ${emptyValueCount} empty values - check data extraction</small>`;
-        jsonPreviewInline.appendChild(debugInfo);
-      }
-    } catch (error) {
-      console.error('Error highlighting JSON, using plain text:', error);
-      // Fallback to plain JSON with copy button
-      var plainJsonString = JSON.stringify(result.loads, null, 2);
-      jsonPreviewInline.innerHTML = `
-        <div class="json-container">
-          <div class="json-header">
-            <span class="json-title">JSON Data (${result.loads.length} loads)</span>
-            <button class="btn btn-sm btn-success copy-json-inline" onclick="copyJSON()" title="Copy JSON to clipboard">
-              📋 Copy JSON
-            </button>
-          </div>
-          <div class="json-content">
-            <pre><code>${plainJsonString}</code></pre>
-          </div>
-        </div>`;
-    }
-  } else {
-    if (!jsonPreviewInline) {
-      console.error('json-preview-inline element not found!');
-    }
-    if (!result.loads || result.loads.length === 0) {
-      console.error('No loads data to display:', result.loads);
-      // Show a helpful message in the JSON area
-      if (jsonPreviewInline) {
-        jsonPreviewInline.innerHTML = `
-          <div class="json-container">
-            <div class="json-header">
-              <span class="json-title">No JSON Data</span>
-            </div>
-            <div class="json-content">
-              <pre><code style="color: #dc2626;">No valid loads found in the data.
-        
-Please check:
-• Spreadsheet has data rows
-• Headers are properly mapped  
-• Required fields are present</code></pre>
-            </div>
-          </div>`;
-      }
-    }
-  }
+  // Display JSON using the common function
+  displayJSONInline(result);
   
   // Show any warnings if they exist
   if (result.issues.length > 0) {
@@ -954,8 +889,27 @@ function displayIssuesResults(result) {
   document.getElementById('issues-panel-title').textContent = 'Issues Found';
   document.getElementById('reanalyze-btn').style.display = 'inline-block';
   
-  // Hide success JSON section (show only when successful)
-  document.getElementById('success-json-section').style.display = 'none';
+  // Show and update analysis flow to indicate we're at the issues/fix stage
+  const analysisFlow = document.getElementById('analysis-flow');
+  if (analysisFlow) {
+    analysisFlow.style.display = 'block';
+    const hasErrors = result.issues.some(issue => issue.severity === 'error');
+    updateAnalysisFlow(hasErrors ? 'fix' : 'issues', result);
+  }
+  
+  // Hide success JSON section initially, but show if we have valid loads despite issues
+  const hasValidLoads = result.loads && result.loads.length > 0;
+  if (hasValidLoads) {
+    // Still show JSON even with warnings
+    const successJsonSection = document.getElementById('success-json-section');
+    if (successJsonSection) {
+      successJsonSection.style.display = 'block';
+      // Update the JSON display
+      displayJSONInline(result);
+    }
+  } else {
+    document.getElementById('success-json-section').style.display = 'none';
+  }
   
   var errors = result.issues.filter(i => i.severity === 'error' || i.type === 'error');
   var warnings = result.issues.filter(i => i.severity === 'warn' || i.type === 'warning');
@@ -1685,16 +1639,22 @@ function showCopySuccess(totalLoads) {
   updateStatus('success', `JSON copied! ${totalLoads} loads ready for import.`);
   addChatMessage('assistant', `✅ JSON data copied to clipboard! Contains ${totalLoads} validated loads ready for TruckTalk import.`);
   
-  // Briefly highlight the copy button
-  var btn = document.getElementById('copy-json-btn');
-  if (btn) {
-    btn.textContent = '✓ Copied!';
-    btn.classList.add('btn-success');
-    setTimeout(() => {
-      btn.innerHTML = '<span class="btn-icon">📋</span> Copy JSON';
-      btn.classList.remove('btn-success');
-    }, 2000);
-  }
+  // Briefly highlight all copy buttons
+  var chatBtn = document.getElementById('copy-json-btn-chat');
+  var resultsBtn = document.getElementById('copy-json-btn-results');
+  var inlineBtn = document.querySelector('.copy-json-inline');
+  
+  [chatBtn, resultsBtn, inlineBtn].forEach(btn => {
+    if (btn) {
+      var originalText = btn.innerHTML;
+      btn.textContent = '✓ Copied!';
+      btn.classList.add('btn-success');
+      setTimeout(() => {
+        btn.innerHTML = originalText;
+        btn.classList.remove('btn-success');
+      }, 2000);
+    }
+  });
 }
 
 /**
@@ -1998,9 +1958,16 @@ function enableExportButtons() {
   var hasValidLoads = currentAnalysis && currentAnalysis.ok && 
                      currentAnalysis.loads && currentAnalysis.loads.length > 0;
   
-  document.getElementById('copy-json-btn').disabled = !hasValidLoads;
-  document.getElementById('preview-push-btn').disabled = !hasValidLoads;
-  document.getElementById('push-trucktalk-btn').disabled = !hasValidLoads;
+  // Enable both copy buttons
+  var chatCopyBtn = document.getElementById('copy-json-btn-chat');
+  var resultsCopyBtn = document.getElementById('copy-json-btn-results');
+  var previewBtn = document.getElementById('preview-push-btn');
+  var pushBtn = document.getElementById('push-trucktalk-btn');
+  
+  if (chatCopyBtn) chatCopyBtn.disabled = !hasValidLoads;
+  if (resultsCopyBtn) resultsCopyBtn.disabled = !hasValidLoads;
+  if (previewBtn) previewBtn.disabled = !hasValidLoads;
+  if (pushBtn) pushBtn.disabled = !hasValidLoads;
 }
 
 /**
@@ -2091,6 +2058,117 @@ function applyAutoFixes() {
     .applyAIAutoFixes(currentAnalysis.autoFixes);
 }
 
+/**
+ * Display JSON in the inline preview section
+ */
+function displayJSONInline(result) {
+  var jsonPreviewInline = document.getElementById('json-preview-inline');
+  if (jsonPreviewInline && result.loads && result.loads.length > 0) {
+    try {
+      var jsonString = JSON.stringify(result.loads, null, 2);
+      var highlightedJson = syntaxHighlightJSON(jsonString);
+      
+      // Create the JSON display with integrated copy button
+      jsonPreviewInline.innerHTML = `
+        <div class="json-container">
+          <div class="json-header">
+            <span class="json-title">JSON Data (${result.loads.length} loads)</span>
+            <button class="btn btn-sm btn-success copy-json-inline" onclick="copyJSON()" title="Copy JSON to clipboard">
+              📋 Copy JSON
+            </button>
+          </div>
+          <div class="json-content">
+            <pre><code>${highlightedJson}</code></pre>
+          </div>
+        </div>`;
+      console.log('JSON displayed inline with copy button, length:', jsonString.length);
+    } catch (error) {
+      console.error('Error displaying JSON inline:', error);
+      // Fallback to plain JSON
+      var plainJsonString = JSON.stringify(result.loads, null, 2);
+      jsonPreviewInline.innerHTML = `
+        <div class="json-container">
+          <div class="json-header">
+            <span class="json-title">JSON Data (${result.loads.length} loads)</span>
+            <button class="btn btn-sm btn-success copy-json-inline" onclick="copyJSON()" title="Copy JSON to clipboard">
+              📋 Copy JSON
+            </button>
+          </div>
+          <div class="json-content">
+            <pre><code>${plainJsonString}</code></pre>
+          </div>
+        </div>`;
+    }
+  }
+}
+
+/**
+ * Update the analysis flow visual indicator
+ */
+function updateAnalysisFlow(currentStep, result) {
+  const steps = ['analyze', 'issues', 'fix', 'json'];
+  const stepElements = {
+    analyze: document.getElementById('step-analyze'),
+    issues: document.getElementById('step-issues'),
+    fix: document.getElementById('step-fix'),
+    json: document.getElementById('step-json')
+  };
+  
+  // Reset all steps
+  steps.forEach(step => {
+    const element = stepElements[step];
+    if (element) {
+      element.classList.remove('completed', 'active', 'error');
+    }
+  });
+  
+  // Set completed steps and current step
+  let currentIndex = steps.indexOf(currentStep);
+  
+  // Analyze step is always completed when we have results
+  if (stepElements.analyze) {
+    stepElements.analyze.classList.add('completed');
+  }
+  
+  // Issues step
+  if (result && result.issues && result.issues.length > 0) {
+    if (stepElements.issues) {
+      stepElements.issues.classList.add('completed');
+    }
+    // If there are unfixed errors, show fix step as active
+    const hasErrors = result.issues.some(issue => issue.severity === 'error');
+    if (hasErrors && currentStep !== 'json') {
+      if (stepElements.fix) {
+        stepElements.fix.classList.add('active');
+      }
+      currentIndex = Math.max(currentIndex, steps.indexOf('fix'));
+    } else {
+      if (stepElements.fix) {
+        stepElements.fix.classList.add('completed');
+      }
+    }
+  } else {
+    // No issues, skip directly to JSON
+    if (stepElements.issues) {
+      stepElements.issues.classList.add('completed');
+    }
+    if (stepElements.fix) {
+      stepElements.fix.classList.add('completed');
+    }
+  }
+  
+  // JSON step
+  if (currentStep === 'json' && result && result.ok) {
+    if (stepElements.json) {
+      stepElements.json.classList.add('completed');
+    }
+  } else if (currentStep === 'json') {
+    if (stepElements.json) {
+      stepElements.json.classList.add('active');
+    }
+  }
+}
+
 // Make functions available globally
 window.analyzeCurrentTab = analyzeCurrentTab;
 window.reAnalyze = reAnalyze;
@@ -2099,6 +2177,7 @@ window.previewPush = previewPush;
 window.closeMappingDialog = closeMappingDialog;
 window.confirmMapping = confirmMapping;
 window.applyAutoFixes = applyAutoFixes;
+window.updateAnalysisFlow = updateAnalysisFlow;
 
 console.log('TruckTalk Connect UI JavaScript loaded');
 </script>

@@ -707,6 +707,84 @@ body {
   font-size: 12px;
 }
 
+/* Analysis Flow Steps */
+.flow-steps {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: #f8fafc;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.flow-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: #e5e7eb;
+  color: #6b7280;
+  font-size: 12px;
+  font-weight: 500;
+  min-width: 60px;
+  transition: all 0.2s ease;
+}
+
+.flow-step.completed {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.flow-step.active {
+  background: #dbeafe;
+  color: #1e40af;
+  animation: pulse 2s infinite;
+}
+
+.flow-step.error {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.step-icon {
+  font-size: 16px;
+  margin-bottom: 4px;
+}
+
+.step-text {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.flow-arrow {
+  color: #9ca3af;
+  font-size: 16px;
+  font-weight: bold;
+  margin: 0 4px;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+@media (max-width: 480px) {
+  .flow-steps {
+    flex-direction: column;
+    gap: 4px;
+  }
+  
+  .flow-arrow {
+    transform: rotate(90deg);
+    margin: 0;
+  }
+}
+
 .issues-list {
   display: flex;
   flex-direction: column;

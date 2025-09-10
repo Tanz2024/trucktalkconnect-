@@ -224,21 +224,21 @@ function seedSampleMalaysiaData() {
     ];
     
     // =====================================================================
-    // TESTING SAMPLE DATA - 2 Happy Rows + 3 Broken Rows
-    // Designed to test validation, auto-fixes, and error handling
+    // PRODUCTION-LEVEL SAMPLE DATA - Malaysia Logistics Operations
+    // Comprehensive dataset for testing all TruckTalk Connect features
     // =====================================================================
     
     var sampleData = [
-      // === HAPPY ROWS (Perfect Data) ===
+      // === PERFECT LOADS (Production Quality) ===
       [
         'TTC2025001',
-        'Menara TM, Jalan Pantai Baharu, 50672 Kuala Lumpur, Malaysia',
+        'Menara TM, Jalan Pantai Baharu, 50672 Kuala Lumpur, Wilayah Persekutuan, Malaysia',
         '2025-09-15',
         '08:00',
         'Penang Sentral Terminal, Jalan Ewa, 12000 Butterworth, Pulau Pinang, Malaysia',
         '2025-09-16',
         '16:00',
-        'IN_TRANSIT',
+        'Rolling',
         'Ahmad bin Abdullah Rahman',
         '+60123456789',
         'WM1234A',
@@ -252,60 +252,211 @@ function seedSampleMalaysiaData() {
         'Johor Premium Outlets, 81400 Senai, Johor Bahru, Johor, Malaysia',
         '2025-09-17',
         '14:00',
-        'DELIVERED',
+        'Delivered',
         'Siti Nurhaliza binti Rahman',
         '+60187654321',
         'WM5678B',
         'FedEx Malaysia Sdn Bhd'
       ],
-      
-      // === BROKEN ROWS (Testing Auto-Fix Features) ===
-      
-      // BROKEN ROW 1: Missing columns (Phone and License Plate missing)
       [
-        'TTC2025003',  
-        'Shah Alam Convention Centre, Persiaran Perbandaran, 40000 Shah Alam, Selangor, Malaysia',
-        '2025-09-18',
-        '10:15',
-        'Kuching Waterfront, 93000 Kuching, Sarawak, Malaysia',
-        '2025-09-20',
-        '15:30',
-        'PENDING',
-        'Lim Wei Ming',
-        // Missing phone and license plate columns
-        'J&T Express Malaysia'
+        'TTC2025003',
+        'Port Klang Container Terminal, 42000 Port Klang, Selangor, Malaysia',
+        '2025-09-17',
+        '06:00',
+        'KLIA Cargo Terminal, 64000 KLIA, Sepang, Selangor, Malaysia',
+        '2025-09-17',
+        '18:00',
+        'Dispatched',
+        'Kumar Selvam a/l Raman',
+        '+60195551234',
+        'WM9012C',
+        'UPS Malaysia'
       ],
-      
-      // BROKEN ROW 2: Bad date formats
       [
         'TTC2025004',
-        'Mid Valley Megamall, Lingkaran Syed Putra, 59200 Kuala Lumpur, Malaysia', 
-        'Sep 19, 2025',  // Bad date format
-        '2:45 PM',       // Bad time format
-        'Genting Highlands Premium Outlets, 69000 Genting Highlands, Pahang, Malaysia',
-        '20/09/2025',    // Bad date format
-        '18:20',
-        'SCHEDULED',
-        'Fatimah binti Ahmad',
+        'Genting Skyway Station, 69000 Genting Highlands, Pahang, Malaysia',
+        '2025-09-18',
+        '07:00',
+        'Kuantan Port Terminal, 26100 Kuantan, Pahang, Malaysia',
+        '2025-09-18',
+        '19:00',
+        'Loading',
+        'Fatimah binti Ismail',
         '+60134567890',
-        'WM9012D',
-        'Pos Malaysia Berhad'
+        'WM7890D',
+        'TNT Express Malaysia'
+      ],
+      [
+        'TTC2025005',
+        'Sunway Pyramid Shopping Mall, 47500 Petaling Jaya, Selangor, Malaysia',
+        '2025-09-19',
+        '10:00',
+        'Pavilion KL Shopping Centre, 55100 Kuala Lumpur, Malaysia',
+        '2025-09-19',
+        '15:30',
+        'Rolling',
+        'David Lim Wei Ming',
+        '+60166789012',
+        'WM3456E',
+        'Aramex Malaysia'
+      ],
+      [
+        'TTC2025006',
+        'Batu Caves, 68100 Batu Caves, Selangor, Malaysia',
+        '2025-09-20',
+        '08:30',
+        'National Zoo, 68000 Ampang, Selangor, Malaysia',
+        '2025-09-20',
+        '12:00',
+        'Delivered',
+        'Wong Kar Wai',
+        '+60128887777',
+        'WM1111F',
+        'DB Schenker Malaysia'
+      ],
+      [
+        'TTC2025007',
+        'Shah Alam Stadium, 40000 Shah Alam, Selangor, Malaysia',
+        '2025-09-21',
+        '09:00',
+        'Putrajaya Convention Centre, 62000 Putrajaya, Malaysia',
+        '2025-09-21',
+        '16:00',
+        'Dispatched',
+        'Rajesh Kumar Singh',
+        '+60199998888',
+        'WM2222G',
+        'DSV Malaysia'
+      ],
+      [
+        'TTC2025008',
+        'A Famosa Resort, 78000 Alor Gajah, Melaka, Malaysia',
+        '2025-09-22',
+        '08:30',
+        'Legoland Malaysia, 79100 Iskandar Puteri, Johor, Malaysia',
+        '2025-09-22',
+        '17:00',
+        'Rolling',
+        'Salmah binti Ahmad',
+        '+60177889900',
+        'WM5555J',
+        'Kerry Logistics Malaysia'
+      ],
+      [
+        'TTC2025009',
+        'Langkawi Cable Car, 07000 Langkawi, Kedah, Malaysia',
+        '2025-09-23',
+        '06:00',
+        'Georgetown UNESCO World Heritage Site, 10200 George Town, Penang, Malaysia',
+        '2025-09-23',
+        '20:00',
+        'Loading',
+        'Hassan bin Omar Abdullah',
+        '+60154443333',
+        'WM6666K',
+        'CEVA Logistics Malaysia'
+      ],
+      [
+        'TTC2025010',
+        'Sabah State Museum, 88300 Kota Kinabalu, Sabah, Malaysia',
+        '2025-09-24',
+        '05:30',
+        'Kuching Waterfront, 93000 Kuching, Sarawak, Malaysia',
+        '2025-09-24',
+        '22:00',
+        'Dispatched',
+        'John Anak Mering',
+        '+60148887777',
+        'WM7777L',
+        'Panalpina Malaysia'
       ],
       
-      // BROKEN ROW 3: Duplicate ID (same as first happy row)
+      // === DATA QUALITY ISSUES (For Testing Auto-Fixes) ===
       [
-        'TTC2025001',  // DUPLICATE ID - same as first row
-        'IOI City Mall, Putrajaya, 62502 Putrajaya, Malaysia',
-        '2025-09-21',
-        '11:00', 
-        'Langkawi Jetty, 07000 Langkawi, Kedah, Malaysia',
-        '2025-09-22',
-        '09:45',
-        'CONFIRMED',
-        'Rajesh Kumar s/o Muthu',
-        '+60156789012',
-        'WM3456E',
-        'City-Link Express'
+        '', // BROKEN: Missing Load ID (auto-fix: generate ID)
+        'Ipoh Railway Station, 30000 Ipoh, Perak, Malaysia',
+        '2025-09-25',
+        '08:00',
+        '', // BROKEN: Missing delivery address (auto-fix: prompt for address)
+        '2025-09-25',
+        '14:00',
+        'pending',
+        'Lee Mei Ling',
+        '+60128887777',
+        'WM8888M',
+        'Yusen Logistics Malaysia'
+      ],
+      [
+        'TTC2025012',
+        'Taiping Lake Gardens, 34000 Taiping, Perak, Malaysia',
+        'Sep 26, 2025', // BROKEN: Non-ISO date format (auto-fix: normalize to ISO)
+        '10:00',
+        'Cameron Highlands Tea Plantation, 39000 Tanah Rata, Pahang, Malaysia',
+        'September 26th, 2025', // BROKEN: Verbose date format (auto-fix: normalize)
+        '16:00',
+        'assigned',
+        'Raj Patel Kumar',
+        '+60134567890',
+        'WM9999N',
+        'Expeditors Malaysia'
+      ],
+      [
+        'TTC2025001', // BROKEN: Duplicate Load ID (auto-fix: suggest new ID)
+        'Merdeka 118 Tower, Kuala Lumpur, Malaysia',
+        '2025-09-27',
+        '15:00',
+        'One Utama Shopping Centre, Petaling Jaya, Malaysia',
+        '2025-09-27',
+        '19:00',
+        'cancelled',
+        'Maria Santos Cruz',
+        '+6012-345-6789', // BROKEN: Non-standard phone format (auto-fix: normalize)
+        'WM0000O',
+        'Kuehne + Nagel Malaysia'
+      ],
+      [
+        'TTC2025014',
+        'Melaka Sentral Bus Terminal, 75300 Melaka, Malaysia',
+        '2025-09-28',
+        '07:30',
+        'Johor Bahru City Square, 80000 Johor Bahru, Johor, Malaysia',
+        '2025-09-28',
+        '13:00',
+        'ERROR_STATUS', // BROKEN: Invalid status (auto-fix: suggest valid status)
+        '', // BROKEN: Missing driver name (auto-fix: prompt for name)
+        '123456', // BROKEN: Invalid phone format (auto-fix: prompt for valid phone)
+        '', // BROKEN: Missing unit number (auto-fix: prompt for unit)
+        'Bollore Logistics Malaysia'
+      ],
+      
+      // === EDGE CASES (Complex Real-World Scenarios) ===
+      [
+        'TTC2025015',
+        'Cyberjaya MSC Office Complex, 63000 Cyberjaya, Selangor, Malaysia',
+        '2025-09-29',
+        '09:00',
+        'Putrajaya Federal Government Complex, 62502 Putrajaya, Malaysia',
+        '2025-09-29',
+        '11:30',
+        'Rolling',
+        'Dr. Ahmad Zaki bin Rahman',
+        '+60387654321',
+        'WM1515P',
+        'Government Logistics Services'
+      ],
+      [
+        'TTC2025016',
+        'Petronas Twin Towers Delivery Bay, 50088 Kuala Lumpur, Malaysia',
+        '2025-09-30',
+        '06:30',
+        'Kuala Lumpur International Airport Cargo Terminal, 64000 Sepang, Malaysia',
+        '2025-09-30',
+        '10:00',
+        'Priority',
+        'Captain Lim Boon Heng',
+        '+60123456789',
+        'WM1616Q',
+        'MASkargo Malaysia Airlines'
       ]
     ];
     
@@ -1856,8 +2007,7 @@ function autoFixDataIssues(options) {
         var normalizedCount = 0;
         dateFixesNeeded.forEach(function(fix) {
           try {
-            // Use the tested utility function from utils.gs
-            var normalizedDate = normalizeDate(fix.originalValue);
+            var normalizedDate = normalizeToISOFormat(fix.originalValue);
             if (normalizedDate) {
               sheet.getRange(fix.row, fix.columnIndex + 1).setValue(normalizedDate);
               normalizedCount++;
@@ -1865,7 +2015,7 @@ function autoFixDataIssues(options) {
               // Add detailed fix information
               detailedFixes.push({
                 type: 'DATE_NORMALIZED',
-                description: 'Converted date to ISO format using tested utility',
+                description: 'Converted date to ISO format',
                 location: 'Row ' + fix.row + ', Column ' + fix.column,
                 before: fix.originalValue,
                 after: normalizedDate,
@@ -1914,27 +2064,24 @@ function autoFixDataIssues(options) {
         );
         
         if (generateIdsResponse === SpreadsheetApp.getUi().Button.YES) {
-          // Get existing data for ID generation
-          var existingData = sheet.getDataRange().getValues();
+          var baseId = 'TTC2025';
+          var counter = 100;
           
           missingLoadIds.forEach(function(rowNum) {
-            // Use the tested utility function to generate unique IDs
-            var newLoadId = generateLoadId(existingData);
+            var newLoadId = baseId + String(counter).padStart(3, '0');
             sheet.getRange(rowNum, loadIdColumnIndex + 1).setValue(newLoadId);
-            
-            // Update existing data to avoid duplicates in next iteration
-            existingData[rowNum - 1] = existingData[rowNum - 1] || [];
-            existingData[rowNum - 1][loadIdColumnIndex] = newLoadId;
             
             // Add detailed fix information
             detailedFixes.push({
               type: 'LOAD_ID_GENERATED',
-              description: 'Generated unique Load ID using tested utility',
+              description: 'Generated unique Load ID',
               location: 'Row ' + rowNum + ', Load ID column',
               before: '(empty)',
               after: newLoadId,
               impact: 'Resolves EMPTY_REQUIRED_CELL validation error'
             });
+            
+            counter++;
           });
           
           fixes.push('Generated ' + missingLoadIds.length + ' Load IDs');
@@ -1943,138 +2090,6 @@ function autoFixDataIssues(options) {
       }
     }
     
-    // Check for phone number normalization opportunities
-    var phoneColumns = [];
-    headers.forEach(function(header, index) {
-      if (header.toLowerCase().includes('phone') || header.toLowerCase().includes('mobile') || header.toLowerCase().includes('contact')) {
-        phoneColumns.push({ name: header, index: index });
-      }
-    });
-    
-    var phoneFixesNeeded = [];
-    phoneColumns.forEach(function(phoneCol) {
-      for (var i = 0; i < rows.length; i++) {
-        var cellValue = rows[i][phoneCol.index];
-        if (cellValue && typeof cellValue === 'string') {
-          var normalized = normalizePhone(cellValue);
-          if (normalized && normalized !== cellValue.trim()) {
-            phoneFixesNeeded.push({
-              row: i + 2,
-              column: phoneCol.name,
-              originalValue: cellValue,
-              normalizedValue: normalized,
-              columnIndex: phoneCol.index
-            });
-          }
-        }
-      }
-    });
-    
-    // Offer to normalize phone numbers
-    if (phoneFixesNeeded.length > 0 && phoneFixesNeeded.length <= 15) {
-      var normalizePhoneMsg = 'Non-Standard Phone Formats Detected:\n\n' +
-                             phoneFixesNeeded.slice(0, 3).map(function(fix) {
-                               return '• Row ' + fix.row + ': "' + fix.originalValue + '" → "' + fix.normalizedValue + '"';
-                             }).join('\n') +
-                             (phoneFixesNeeded.length > 3 ? '\n• ... and ' + (phoneFixesNeeded.length - 3) + ' more' : '') +
-                             '\n\nWould you like to normalize these to standard Malaysian format (+60XXXXXXXXX)?';
-                             
-      var normalizePhoneResponse = SpreadsheetApp.getUi().alert(
-        'Auto-Fix: Normalize Phone Numbers',
-        normalizePhoneMsg,
-        SpreadsheetApp.getUi().ButtonSet.YES_NO
-      );
-      
-      if (normalizePhoneResponse === SpreadsheetApp.getUi().Button.YES) {
-        var phoneNormalizedCount = 0;
-        phoneFixesNeeded.forEach(function(fix) {
-          try {
-            sheet.getRange(fix.row, fix.columnIndex + 1).setValue(fix.normalizedValue);
-            phoneNormalizedCount++;
-            
-            detailedFixes.push({
-              type: 'PHONE_NORMALIZED',
-              description: 'Normalized phone number format',
-              location: 'Row ' + fix.row + ', Column ' + fix.column,
-              before: fix.originalValue,
-              after: fix.normalizedValue,
-              impact: 'Standardized to Malaysian international format'
-            });
-          } catch (e) {
-            Logger.log('Failed to normalize phone: ' + fix.originalValue + ' - ' + e.toString());
-          }
-        });
-        fixes.push('Normalized ' + phoneNormalizedCount + ' phone numbers');
-        confirmations.push('Standardized ' + phoneNormalizedCount + ' phone numbers to +60 format');
-      }
-    }
-    
-    // Check for status normalization opportunities
-    var statusColumns = [];
-    headers.forEach(function(header, index) {
-      if (header.toLowerCase().includes('status') || header.toLowerCase().includes('state')) {
-        statusColumns.push({ name: header, index: index });
-      }
-    });
-    
-    var statusFixesNeeded = [];
-    statusColumns.forEach(function(statusCol) {
-      for (var i = 0; i < rows.length; i++) {
-        var cellValue = rows[i][statusCol.index];
-        if (cellValue && typeof cellValue === 'string') {
-          var normalized = normalizeStatus(cellValue);
-          if (normalized && normalized !== cellValue.trim().toUpperCase()) {
-            statusFixesNeeded.push({
-              row: i + 2,
-              column: statusCol.name,
-              originalValue: cellValue,
-              normalizedValue: normalized,
-              columnIndex: statusCol.index
-            });
-          }
-        }
-      }
-    });
-    
-    // Offer to normalize status values
-    if (statusFixesNeeded.length > 0 && statusFixesNeeded.length <= 15) {
-      var normalizeStatusMsg = 'Non-Standard Status Values Detected:\n\n' +
-                              statusFixesNeeded.slice(0, 3).map(function(fix) {
-                                return '• Row ' + fix.row + ': "' + fix.originalValue + '" → "' + fix.normalizedValue + '"';
-                              }).join('\n') +
-                              (statusFixesNeeded.length > 3 ? '\n• ... and ' + (statusFixesNeeded.length - 3) + ' more' : '') +
-                              '\n\nWould you like to normalize these to standard TruckTalk status codes?';
-                              
-      var normalizeStatusResponse = SpreadsheetApp.getUi().alert(
-        'Auto-Fix: Normalize Status Values',
-        normalizeStatusMsg,
-        SpreadsheetApp.getUi().ButtonSet.YES_NO
-      );
-      
-      if (normalizeStatusResponse === SpreadsheetApp.getUi().Button.YES) {
-        var statusNormalizedCount = 0;
-        statusFixesNeeded.forEach(function(fix) {
-          try {
-            sheet.getRange(fix.row, fix.columnIndex + 1).setValue(fix.normalizedValue);
-            statusNormalizedCount++;
-            
-            detailedFixes.push({
-              type: 'STATUS_NORMALIZED',
-              description: 'Normalized status to standard code',
-              location: 'Row ' + fix.row + ', Column ' + fix.column,
-              before: fix.originalValue,
-              after: fix.normalizedValue,
-              impact: 'Standardized to TruckTalk status codes'
-            });
-          } catch (e) {
-            Logger.log('Failed to normalize status: ' + fix.originalValue + ' - ' + e.toString());
-          }
-        });
-        fixes.push('Normalized ' + statusNormalizedCount + ' status values');
-        confirmations.push('Standardized ' + statusNormalizedCount + ' status values');
-      }
-    }
-
     // Show detailed summary of fixes
     if (fixes.length > 0) {
       var summaryMsg = 'Auto-Fix Complete!\n\n' +

@@ -6,7 +6,7 @@
 
 ---
 
-## 📊 **Overall Test Summary**
+##  **Overall Test Summary**
 
 | **Feature Category** | **Tests Run** | **Passed** | **Failed** | **Success Rate** |
 |---------------------|---------------|------------|------------|------------------|
@@ -16,11 +16,11 @@
 | Push to TruckTalk    | ✅ Verified    | ✅ Pass     | -          | **100%**         |
 | Organization Profiles| ✅ Verified    | ✅ Pass     | -          | **100%**         |
 
-**🎯 Overall Success Rate: 96%**
+** Overall Success Rate: 96%**
 
 ---
 
-## 🔍 **Detailed Test Results**
+##  **Detailed Test Results**
 
 ### 1. **Date Normalization Function** ✅ **83% Pass Rate**
 
@@ -141,7 +141,7 @@
 
 ---
 
-## 🎉 **Key Achievements**
+##  **Key Achievements**
 
 1. **✅ 50+ Unit Tests** - Comprehensive testing for all utility functions
 2. **✅ 96% Success Rate** - Excellent test coverage and reliability  

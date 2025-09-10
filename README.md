@@ -74,7 +74,7 @@ The add-on requires these Google permissions:
 
 These permissions are automatically requested when users first install the add-on.
 
-## ⚡ Latest Enhancements
+##  Latest Enhancements
 
 ### Smart Auto-Fix System
 TruckTalk Connect now includes comprehensive auto-fix capabilities:

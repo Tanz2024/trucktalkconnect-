@@ -96,7 +96,7 @@ function testAIConnection() {
     // Show immediate feedback to user
     SpreadsheetApp.getUi().alert('Testing AI Connection', 'Testing connection to TruckTalk AI server...', SpreadsheetApp.getUi().ButtonSet.OK);
     
-    var vercelEndpoint = 'https://trucktalkconnect.vercel.app/api/ai';
+    var vercelEndpoint = 'https://trucktalkconnect-awaayixg7-tanzs-projects-ccb5cdb8.vercel.app/api/ai';
 
     // Simple test payload
     var body = {
@@ -827,7 +827,7 @@ function callAIAnalysis(payload) {
   try {
     Logger.log('Calling AI analysis API with payload size: ' + JSON.stringify(payload).length);
     
-    var url = 'https://trucktalkconnect.vercel.app/api/ai';
+    var url = 'https://trucktalkconnect-awaayixg7-tanzs-projects-ccb5cdb8.vercel.app/api/ai';
     
     // Create request payload
     var requestPayload = JSON.stringify(payload);
@@ -1178,7 +1178,7 @@ function callOpenAI(sheetData) {
       payload: JSON.stringify(payload)
     };
 
-    var response = UrlFetchApp.fetch('https://trucktalkconnect.vercel.app/api/ai', options);
+    var response = UrlFetchApp.fetch('https://trucktalkconnect-awaayixg7-tanzs-projects-ccb5cdb8.vercel.app/api/ai', options);
     var responseCode = response.getResponseCode();
     
     if (responseCode === 200) {
@@ -4274,7 +4274,7 @@ function analyzeActiveSheet(options = {}) {
 function callTruckTalkAIAPI(payload, requestId) {
   try {
     // Production API endpoint
-    const API_ENDPOINT = 'https://trucktalkconnect-.vercel.app/api/ai';
+    const API_ENDPOINT = 'https://trucktalkconnect-awaayixg7-tanzs-projects-ccb5cdb8.vercel.app/api/ai';
     
     // Get configuration from Script Properties
     const properties = PropertiesService.getScriptProperties();

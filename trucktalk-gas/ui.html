@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="theme-color" content="#2563eb">
+    <title>TruckTalk Connect</title>
+    
+    <!-- Include CSS -->
+    <?!= include('ui_css'); ?>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-content">
+                <div class="header-title">
+                    <h1>TruckTalk Connect</h1>
+                </div>
+                <button class="close-btn" onclick="google.script.host.close()" title="Close">×</button>
+            </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="nav-tabs">
+            <button class="tab-btn active" data-tab="chat" title="Chat (Ctrl+1)">
+                Chat
+            </button>
+            <button class="tab-btn" data-tab="results" title="Results (Ctrl+2)">
+                Results
+            </button>
+            <div class="tab-shortcuts" title="Use Ctrl+1/2 or Alt+←/→ to switch tabs">
+                <span class="keyboard-hint">⌨</span>
+            </div>
+        </div>
+
+        <!-- Chat Tab Content -->
+        <div id="chat-tab" class="tab-content active">
+            <div class="chat-container">
+                <!-- Status Display -->
+                <div class="status-display">
+                    <div id="status-indicator" class="status-ready">
+                        <span id="status-text">Ready to analyze your data</span>
+                    </div>
+                </div>
+
+                <!-- Chat Messages -->
+                <div class="chat-messages" id="chat-messages">
+                    <div class="message assistant">
+                        <div class="message-content">
+                            How can I assist you today?
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="action-buttons">
+                    <button id="analyze-btn" class="btn btn-primary" onclick="analyzeCurrentTab()">
+                        <span class="btn-icon"></span>
+                        Analyze current tab
+                    </button>
+                    
+                    <button id="copy-json-btn" class="btn btn-success" onclick="copyJSON()" disabled>
+                        <span class="btn-icon"></span>
+                        Copy JSON
+                    </button>
+                    
+                    <button id="preview-push-btn" class="btn btn-outline" onclick="previewPush()" disabled>
+                        <span class="btn-icon"></span>
+                        Preview Push
+                    </button>
+                    
+                    <button id="reanalyze-btn" class="btn btn-secondary" onclick="reAnalyze()" style="display: none;">
+                        <span class="btn-icon"></span>
+                        Re-analyze
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Tab Content -->
+        <div id="results-tab" class="tab-content">
+            <div class="results-container">
+                <div class="results-content" id="results-content">
+                    <!-- Empty State -->
+                    <div id="empty-state" class="empty-state">
+                        <span class="empty-icon"></span>
+                        <h3>No Analysis Yet</h3>
+                        <p>Click "Analyze current tab" to validate your data and see results here.</p>
+                        <div class="empty-subtitle">
+                            Results will include validation issues, data mapping, and export options.
+                        </div>
+                    </div>
+
+                    <!-- Issues Panel -->
+                    <div id="issues-panel" style="display: none;">
+                        <div class="issues-header">
+                            <h3 id="issues-panel-title">Analysis Results</h3>
+                        </div>
+                        
+                        <!-- Success JSON Display (shown when no errors) -->
+                        <div id="success-json-section" style="display: none;">
+                            <h4 id="success-section-title" class="issue-section-title success">📄 Structured Data Ready</h4>
+                            <div class="success-summary">
+                                <div id="success-loads-count" class="loads-count-inline"></div>
+                                <div class="json-display-inline">
+                                    <div id="json-preview-inline" class="json-preview"></div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Error Issues -->
+                        <div id="error-issues" style="display: none;">
+                            <h4 class="issue-section-title error">Errors</h4>
+                            <div id="error-issues-list" class="issues-list"></div>
+                        </div>
+                        
+                        <!-- Warning Issues -->
+                        <div id="warning-issues" style="display: none;">
+                            <h4 class="issue-section-title warning">Warnings</h4>
+                            <div id="warning-issues-list" class="issues-list"></div>
+                        </div>
+                        
+                        <!-- AI Auto-Fix Section -->
+                        <div id="ai-autofix-section" class="ai-autofix-section" style="display: none;">
+                            <h4> AI Auto-Fix</h4>
+                            <p>Let AI automatically fix common errors in your data:</p>
+                            <div class="autofix-buttons">
+                                <button id="ai-autofix-btn" class="btn btn-success" onclick="startAIAutoFix()">
+                                     Fix Errors with AI
+                                </button>
+                                <span class="autofix-note">AI will suggest fixes for missing data, duplicates, and format issues</span>
+                            </div>
+                        </div>
+
+                        <!-- Fix Hints -->
+                        <div id="fix-hints" class="fix-hints">
+                            <h4>Fix Hints</h4>
+                            <div id="fix-hints-content"></div>
+                        </div>
+                    </div>
+
+                    <!-- Success Panel -->
+                    <div id="success-panel" style="display: none;">
+                        <div class="success-header">
+                            <h3>Analysis Complete</h3>
+                            <div id="loads-count" class="loads-count"></div>
+                        </div>
+                        
+                        <!-- Loads JSON Display -->
+                        <div id="loads-json" class="loads-json">
+                            <h4>Loads JSON</h4>
+                            <div id="json-preview" class="json-preview"></div>
+                        </div>
+                        
+                        <!-- Action Buttons -->
+                        <div class="action-buttons">
+                            <button id="copy-json-btn" class="btn btn-primary" onclick="copyJSON()" disabled>
+                                Copy JSON
+                            </button>
+                            <button id="preview-push-btn" class="btn btn-outline" onclick="previewPush()" disabled>
+                                Preview Push
+                            </button>
+                            <button id="push-trucktalk-btn" class="btn btn-success" onclick="pushToTruckTalk()" disabled title="Currently disabled - demo only">
+                                Push to TruckTalk
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Header Mapping Display -->
+                    <div id="mapping-display" style="display: none;">
+                        <h4>Header Mapping</h4>
+                        <div id="mapping-list" class="mapping-list"></div>
+                    </div>
+
+                    <!-- Analysis Meta -->
+                    <div id="analysis-meta" style="display: none;">
+                        <div class="meta-info">
+                            <div class="meta-item">
+                                <span class="meta-label">Rows analyzed:</span>
+                                <span id="meta-rows">0</span>
+                            </div>
+                            <div class="meta-item">
+                                <span class="meta-label">Analyzed at:</span>
+                                <span id="meta-timestamp">-</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mapping Dialog -->
+    <div id="mapping-dialog" class="dialog-overlay" style="display: none;">
+        <div class="dialog-content">
+            <div class="dialog-header">
+                <h3>Confirm Header Mapping</h3>
+                <button class="dialog-close" onclick="closeMappingDialog()">×</button>
+            </div>
+            <div class="dialog-body">
+                <p>Multiple columns could match the same field. Please confirm the mapping:</p>
+                <div id="mapping-options" class="mapping-options">
+                    <!-- Mapping options will be populated by JavaScript -->
+                </div>
+            </div>
+            <div class="dialog-footer">
+                <button class="btn btn-outline" onclick="closeMappingDialog()">Cancel</button>
+                <button class="btn btn-primary" onclick="confirmMapping()">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Include JavaScript -->
+    <?!= include('ui_js'); ?>
+</body>
+</html>

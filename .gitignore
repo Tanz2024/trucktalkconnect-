@@ -36,15 +36,20 @@ build/
 # Documentation and development files (keep out of repo)
 .env.example
 AI_TROUBLESHOOTING.md
-Code.gs
 IMPLEMENTATION_SUMMARY.md
 STRETCH_GOALS_IMPLEMENTATION.md
 TESTING.md
-appsscript.json
 sidebar.html
 sample-data-with-issues.csv
-ui.html
-ui_css.html
-ui_js.html
 components/
 test/
+
+# Google Apps Script files in root (use trucktalk-gas/ folder instead)
+/Code.gs
+/ui.html
+/ui_css.html
+/ui_js.html
+/appsscript.json
+
+# But allow Google Apps Script files in the trucktalk-gas folder
+!trucktalk-gas/

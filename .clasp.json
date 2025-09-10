@@ -1,0 +1,10 @@
+{
+  "scriptId": "",
+  "rootDir": "./gas-files/",
+  "filePushOrder": [
+    "Code.gs",
+    "ui.html",
+    "ui_js.html", 
+    "ui_css.html"
+  ]
+}

@@ -712,14 +712,30 @@ function syntaxHighlightJSON(json) {
 function displaySuccessInIssuesPanel(result) {
   console.log('displaySuccessInIssuesPanel called with result:', result);
 
-  // Clear existing AI sections to prevent duplicates during reanalysis
-  console.log('Clearing existing AI analysis sections...');
-  var existingSections = document.querySelectorAll('.ai-analysis-section, .ai-changes-section, .ai-autofixes-section');
-  existingSections.forEach(section => {
-    console.log('Removing existing AI section');
+  // Clear ALL existing AI sections to prevent duplicates during reanalysis
+  console.log('=== COMPREHENSIVE AI SECTION CLEARING ===');
+  
+  // Remove all AI-related sections from entire document
+  var allAISections = document.querySelectorAll('.ai-analysis-section, .ai-changes-section, .ai-autofixes-section, .ai-autofix-section, [class*="ai-"], .autofix-buttons, .ai-mapping-indicator');
+  console.log('Found ' + allAISections.length + ' AI sections to remove');
+  
+  allAISections.forEach((section, index) => {
+    console.log('Removing AI section ' + (index + 1) + ':', section.className);
     section.remove();
   });
-  console.log('Cleared ' + existingSections.length + ' existing AI sections');
+  
+  // Also clear any AI content from issues panel specifically
+  var issuesContent = document.querySelector('#issues-panel .results-content');
+  if (issuesContent) {
+    var duplicateAISections = issuesContent.querySelectorAll('.ai-analysis-section, .ai-changes-section, .ai-autofixes-section, [class*="ai-"]');
+    console.log('Found ' + duplicateAISections.length + ' duplicate AI sections in issues panel');
+    duplicateAISections.forEach(section => {
+      console.log('Removing duplicate AI section from issues panel');
+      section.remove();
+    });
+  }
+  
+  console.log('=== AI SECTION CLEARING COMPLETE ===');
   
   // Hide empty state and success panel
   const emptyState = document.getElementById('empty-state');
@@ -937,30 +953,7 @@ Debug info:
     chatPreviewBtn.disabled = false;
   }
   
-  // Show enhanced AI analysis information
-  try {
-    displayAIAnalysisSection(result);
-  } catch (error) {
-    console.error('Error displaying AI analysis section:', error);
-  }
-  
-  // Show changes made by AI if available (legacy support)
-  if (result.changes && result.changes.length > 0) {
-    try {
-      displayChangesSection(result.changes);
-    } catch (error) {
-      console.error('Error displaying changes section:', error);
-    }
-  }
-  
-  // Show auto-fixes if available (legacy support)
-  if (result.autoFixes && result.autoFixes.length > 0) {
-    try {
-      displayAutoFixesSection(result.autoFixes);
-    } catch (error) {
-      console.error('Error displaying auto-fixes section:', error);
-    }
-  }
+  // Legacy AI display code removed - now handled by displayAIAnalysisSection call at the end of this function
   
   // Show Re-analyze button
   document.getElementById('reanalyze-btn').style.display = 'inline-block';
@@ -1106,9 +1099,7 @@ function displayAIAnalysisSection(result) {
     console.log('Removing existing AI section');
     section.remove();
   });
-  console.log('Cleared ' + existingSections.length + ' existing AI sections');
-    return;
-  }
+    console.log('Cleared ' + existingSections.length + ' existing AI sections');
   
   var aiSectionHtml = '<div class="ai-analysis-section" style="margin: 15px 0; padding: 15px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #007bff;">';
   aiSectionHtml += '<h4 style="margin: 0 0 10px 0; color: #007bff;">AI Analysis Results</h4>';
@@ -2250,6 +2241,3 @@ window.testJSONDisplay = testJSONDisplay;
 
 console.log('TruckTalk Connect UI JavaScript loaded');
 </script>
-/ /   T e s t   c o m m e n t   t o   v e r i f y   f i l e   e d i t i n g 
- 
- 

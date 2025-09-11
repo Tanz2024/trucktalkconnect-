@@ -78,10 +78,16 @@ These permissions are automatically requested when users first install the add-o
 
 See TruckTalk Connect in action with our comprehensive demo:
 
-<video width="800" controls>
-  <source src="https://github.com/Tanz2024/trucktalkconnect-/raw/master/trucktalk-gas/assets/demo-video.mp4" type="video/mp4">
-  Your browser does not support the video tag. <a href="https://github.com/Tanz2024/trucktalkconnect-/raw/master/trucktalk-gas/assets/demo-video.mp4">Download the video</a>
-</video>
+<div align="center">
+
+[![TruckTalk Connect Demo](https://github.com/Tanz2024/trucktalkconnect-/raw/master/trucktalk-gas/assets/video-thumbnail.jpg)](https://github.com/Tanz2024/trucktalkconnect-/raw/master/trucktalk-gas/assets/demo-video.mp4)
+
+**🎬 Click the screenshot above to watch the full demo video**  
+*See TruckTalk Connect in action - AI data analysis and auto-fix features*
+
+[![Watch Video](https://img.shields.io/badge/📹_WATCH_DEMO_VIDEO-Click_to_Stream-red?style=for-the-badge&logo=youtube&logoColor=white&labelColor=red&color=black)](https://github.com/Tanz2024/trucktalkconnect-/raw/master/trucktalk-gas/assets/demo-video.mp4) [![Download Video](https://img.shields.io/badge/📥_Download_Video-MP4_124MB-blue?style=for-the-badge&logo=download)](https://github.com/Tanz2024/trucktalkconnect-/raw/master/trucktalk-gas/assets/demo-video.mp4)
+
+</div>
 
 **What the demo covers:**
 - Opening TruckTalk Connect in Google Sheets

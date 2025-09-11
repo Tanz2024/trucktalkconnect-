@@ -10,16 +10,12 @@ Watch TruckTalk Connect in action - AI-powered logistics data analysis with Goog
 
 <div align="center">
 
-<video width="800" height="450" controls poster="https://img.shields.io/badge/📹_TruckTalk_Connect_Demo-Click_Play_to_Watch-blue?style=for-the-badge&logo=video">
-  <source src="https://github.com/Tanz2024/trucktalkconnect-/raw/master/trucktalk-gas/assets/demo-video.mp4" type="video/mp4">
-  <p>Your browser doesn't support HTML video. <a href="https://github.com/Tanz2024/trucktalkconnect-/raw/master/trucktalk-gas/assets/demo-video.mp4">Download the video</a> instead.</p>
-</video>
+[![TruckTalk Connect Demo](./assets/video-thumbnail.jpg)](https://github.com/Tanz2024/trucktalkconnect-/raw/master/trucktalk-gas/assets/demo-video.mp4)
 
-*🎬 Click the play button above to watch the full demonstration*
+**🎬 Click the screenshot above to watch the full demo video**  
+*See TruckTalk Connect in action - AI data analysis and auto-fix features*
 
-**Alternative Links:**
-- [📥 Download Video](https://github.com/Tanz2024/trucktalkconnect-/raw/master/trucktalk-gas/assets/demo-video.mp4)
-- [🔗 View in Repository](https://github.com/Tanz2024/trucktalkconnect-/blob/master/trucktalk-gas/assets/demo-video.mp4)
+[![Watch Video](https://img.shields.io/badge/📹_WATCH_DEMO_VIDEO-Click_to_Stream-red?style=for-the-badge&logo=youtube&logoColor=white&labelColor=red&color=black)](https://github.com/Tanz2024/trucktalkconnect-/raw/master/trucktalk-gas/assets/demo-video.mp4) [![Download Video](https://img.shields.io/badge/📥_Download_Video-MP4_124MB-blue?style=for-the-badge&logo=download)](https://github.com/Tanz2024/trucktalkconnect-/raw/master/trucktalk-gas/assets/demo-video.mp4)
 
 </div>
 

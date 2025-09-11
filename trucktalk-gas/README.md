@@ -10,11 +10,15 @@ Watch TruckTalk Connect in action - AI-powered logistics data analysis with Goog
 
 <div align="center">
 
-**[▶️ Watch Full Demo (MP4)](./assets/demo-video.mp4)**
+> **🎬 Demo Video Available Locally**  
+> Due to GitHub's file size limits, the demo video is available in your local `assets/demo-video.mp4`
 
-*Complete walkthrough of TruckTalk Connect features and workflow*
+**Alternative Options:**
+- **📤 Upload to YouTube/Vimeo** for public sharing
+- **🔗 Use GitHub Releases** to attach large files
+- **☁️ Cloud Storage** link (Google Drive, Dropbox)
 
-[![Video Preview](https://img.shields.io/badge/▶️_Click_to_Watch-Demo_Video-blue?style=for-the-badge&logo=video)](./assets/demo-video.mp4)
+[![Video Coming Soon](https://img.shields.io/badge/📹_Demo_Video-Coming_Soon-orange?style=for-the-badge&logo=video)](./assets/)
 
 </div>
 
@@ -26,7 +30,7 @@ Watch TruckTalk Connect in action - AI-powered logistics data analysis with Goog
 - ✅ **Validation & Quality Check** - Complete data validation process  
 - 📤 **JSON Export Process** - Ready-to-use structured output
 
-> 💡 **Note:** Video shows the complete end-to-end workflow with real data transformation
+> 💡 **For Developers:** The demo video (`demo-video.mp4`) is available locally in the `assets/` folder. To share publicly, consider uploading to YouTube or using Git LFS for large files.
 
 > 🎯 **What you'll see:**
 > - Real-time data analysis and validation

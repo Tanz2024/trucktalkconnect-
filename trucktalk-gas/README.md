@@ -10,11 +10,16 @@ Watch TruckTalk Connect in action - AI-powered logistics data analysis with Goog
 
 <div align="center">
 
-**[▶️ Watch Demo Video](https://github.com/Tanz2024/trucktalkconnect-/raw/master/trucktalk-gas/assets/demo-video.mp4)**
+<video width="800" height="450" controls poster="https://img.shields.io/badge/📹_TruckTalk_Connect_Demo-Click_Play_to_Watch-blue?style=for-the-badge&logo=video">
+  <source src="https://github.com/Tanz2024/trucktalkconnect-/raw/master/trucktalk-gas/assets/demo-video.mp4" type="video/mp4">
+  <p>Your browser doesn't support HTML video. <a href="https://github.com/Tanz2024/trucktalkconnect-/raw/master/trucktalk-gas/assets/demo-video.mp4">Download the video</a> instead.</p>
+</video>
 
-*Click above to stream or download the full demonstration*
+*🎬 Click the play button above to watch the full demonstration*
 
-[![Watch Demo](https://img.shields.io/badge/📹_Watch_Demo-MP4_Video-blue?style=for-the-badge&logo=video)](https://github.com/Tanz2024/trucktalkconnect-/raw/master/trucktalk-gas/assets/demo-video.mp4)
+**Alternative Links:**
+- [📥 Download Video](https://github.com/Tanz2024/trucktalkconnect-/raw/master/trucktalk-gas/assets/demo-video.mp4)
+- [🔗 View in Repository](https://github.com/Tanz2024/trucktalkconnect-/blob/master/trucktalk-gas/assets/demo-video.mp4)
 
 </div>
 

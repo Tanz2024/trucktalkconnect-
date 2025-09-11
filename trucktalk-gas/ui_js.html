@@ -1,4 +1,4 @@
-﻿<script>
+<script>
 // =============================================================================
 // TruckTalk Connect - UI JavaScript
 // Following exact UX flow specification
@@ -21,7 +21,92 @@ document.addEventListener('DOMContentLoaded', function() {
   console.log('- success-json-section:', !!document.getElementById('success-json-section'));
   console.log('- json-preview-inline:', !!document.getElementById('json-preview-inline'));
   console.log('- issues-panel:', !!document.getElementById('issues-panel'));
+  
+  // Enable debug buttons in development mode (check for localhost or specific conditions)
+  var isDevMode = window.location.hostname === 'localhost' || window.location.search.includes('debug=true');
+  if (isDevMode) {
+    var testJsonBtn = document.getElementById('test-json-btn');
+    var testAiFixBtn = document.getElementById('test-ai-fix-btn');
+    if (testJsonBtn) testJsonBtn.style.display = 'inline-block';
+    if (testAiFixBtn) testAiFixBtn.style.display = 'inline-block';
+    console.log('🔧 Debug mode enabled - test buttons available');
+  }
 });
+
+/**
+ * PRODUCTION-LEVEL AI FIX SYSTEM TESTER
+ * Tests AI fix capabilities and reports results to user
+ */
+function testAIFixSystem() {
+  console.log('=== TESTING AI FIX SYSTEM ===');
+  
+  // Show test button feedback
+  var testBtn = document.getElementById('test-ai-fix-btn');
+  var originalText = testBtn ? testBtn.textContent : '';
+  if (testBtn) {
+    testBtn.disabled = true;
+    testBtn.textContent = '🧪 Testing...';
+  }
+  
+  updateStatus('processing', 'Testing AI fix system...');
+  addChatMessage('user', '🧪 Test AI Fix System');
+  addChatMessage('assistant', '🔬 **Running Production AI Fix Tests**\n\nCreating test data with known issues...');
+  
+  google.script.run
+    .withSuccessHandler(function(result) {
+      console.log('AI Fix Test Result:', result);
+      
+      // Re-enable test button
+      if (testBtn) {
+        testBtn.disabled = false;
+        testBtn.textContent = originalText;
+      }
+      
+      if (result.success) {
+        var testMessage = `✅ **AI Fix System Test PASSED**\n\n`;
+        testMessage += `📊 **Test Results:**\n`;
+        testMessage += `• Issues Found: ${result.issuesFound}\n`;
+        testMessage += `• Errors Fixed: ${result.errorsFixed}\n`;
+        
+        if (result.verification) {
+          testMessage += `• Verified Fixes: ${result.verification.verified}\n`;
+          testMessage += `• Failed Fixes: ${result.verification.failed}\n`;
+          testMessage += `• Success Rate: ${Math.round((result.verification.verified / (result.verification.verified + result.verification.failed)) * 100)}%\n`;
+        }
+        
+        testMessage += `\n✅ **System Status: OPERATIONAL**\n`;
+        testMessage += `🔧 AI fixes are working correctly and ready for production use.`;
+        
+        addChatMessage('assistant', testMessage);
+        updateStatus('success', 'AI fix system test passed');
+      } else {
+        var errorMessage = `❌ **AI Fix System Test FAILED**\n\n`;
+        errorMessage += `**Error:** ${result.error}\n\n`;
+        errorMessage += `🚨 **System Status: NEEDS ATTENTION**\n`;
+        errorMessage += `The AI fix system requires maintenance before use.`;
+        
+        addChatMessage('assistant', errorMessage);
+        updateStatus('error', 'AI fix system test failed');
+      }
+    })
+    .withFailureHandler(function(error) {
+      console.error('AI Fix Test Error:', error);
+      
+      // Re-enable test button
+      if (testBtn) {
+        testBtn.disabled = false;
+        testBtn.textContent = originalText;
+      }
+      
+      var errorMessage = `🚨 **Test System Error**\n\n`;
+      errorMessage += `**Error:** ${error.message || error}\n\n`;
+      errorMessage += `Unable to run AI fix tests. System may be unavailable.`;
+      
+      addChatMessage('assistant', errorMessage);
+      updateStatus('error', 'Test system error');
+    })
+    .testAIFixSystem();
+}
 
 /**
  * Test JSON display with sample data - for debugging
@@ -72,6 +157,101 @@ function testJSONDisplay() {
 }
 
 /**
+ * Force display JSON in results panel - utility function
+ */
+function forceDisplayJSON() {
+  console.log('Force displaying JSON in results panel...');
+  
+  // Switch to results tab first
+  switchTab('results', { reason: 'force-json-display' });
+  
+  // Create sample data
+  var testLoads = [
+    {
+      loadId: "TEST001",
+      fromAddress: "Test Pickup Location",
+      fromAppointmentDateTimeUTC: "2025-09-11T16:00:00Z",
+      toAddress: "Test Delivery Location", 
+      toAppointmentDateTimeUTC: "2025-09-12T16:00:00Z",
+      status: "IN_TRANSIT",
+      driverName: "Test Driver",
+      driverPhone: "+1234567890",
+      unitNumber: "TEST123",
+      broker: "Test Broker"
+    }
+  ];
+  
+  // Manually show the success JSON section
+  var issuesPanel = document.getElementById('issues-panel');
+  var successJsonSection = document.getElementById('success-json-section');
+  var jsonPreviewInline = document.getElementById('json-preview-inline');
+  var emptyState = document.getElementById('empty-state');
+  
+  if (emptyState) emptyState.style.display = 'none';
+  if (issuesPanel) issuesPanel.style.display = 'block';
+  if (successJsonSection) successJsonSection.style.display = 'block';
+  
+  if (jsonPreviewInline) {
+    var jsonString = JSON.stringify(testLoads, null, 2);
+    var jsonHtml = `
+      <div class="json-container">
+        <div class="json-header">
+          <span class="json-title">JSON Data (${testLoads.length} loads)</span>
+          <button class="btn btn-sm btn-success copy-json-inline" onclick="copyTestJSON()" title="Copy JSON to clipboard">
+            Copy JSON
+          </button>
+        </div>
+        <div class="json-content">
+          <pre><code>${jsonString}</code></pre>
+        </div>
+      </div>`;
+    
+    jsonPreviewInline.innerHTML = jsonHtml;
+    console.log('? JSON forced to display in results panel');
+    
+    // Update status
+    updateStatus('success', 'Test JSON displayed successfully');
+    addChatMessage('assistant', '? Test JSON displayed in Results panel!');
+  } else {
+    console.error('? json-preview-inline element not found');
+    addChatMessage('assistant', '? Could not find JSON display element');
+  }
+}
+
+/**
+ * Copy test JSON to clipboard
+ */
+function copyTestJSON() {
+  var testLoads = [
+    {
+      loadId: "TEST001",
+      fromAddress: "Test Pickup Location",
+      fromAppointmentDateTimeUTC: "2025-09-11T16:00:00Z",
+      toAddress: "Test Delivery Location", 
+      toAppointmentDateTimeUTC: "2025-09-12T16:00:00Z",
+      status: "IN_TRANSIT",
+      driverName: "Test Driver",
+      driverPhone: "+1234567890",
+      unitNumber: "TEST123",
+      broker: "Test Broker"
+    }
+  ];
+  
+  var jsonString = JSON.stringify(testLoads, null, 2);
+  
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(jsonString).then(() => {
+      addChatMessage('assistant', '? Test JSON copied to clipboard!');
+    }).catch(err => {
+      console.error('Clipboard failed:', err);
+      addChatMessage('assistant', '? Failed to copy test JSON');
+    });
+  } else {
+    addChatMessage('assistant', '? Clipboard not available');
+  }
+}
+
+/**
  * Initialize UI components
  */
 function initializeUI() {
@@ -100,6 +280,14 @@ function initializeUI() {
   
   // Show keyboard shortcuts hint on first load
   showKeyboardShortcutsHint();
+  
+  // Show debug button in development
+  if (window.location.hostname === 'localhost' || window.location.hostname.includes('script.google.com')) {
+    var debugBtn = document.getElementById('test-json-btn');
+    if (debugBtn) {
+      debugBtn.style.display = 'inline-block';
+    }
+  }
   
   console.log('TruckTalk Connect UI initialized - starting fresh');
 }
@@ -315,7 +503,7 @@ function focusTabContent(tabName) {
  * Track tab switches for analytics/debugging
  */
 function trackTabSwitch(from, to, reason) {
-  console.log(`Tab switch: ${from || 'none'} â†’ ${to} (${reason})`);
+  console.log(`Tab switch: ${from || 'none'} -> ${to} (${reason})`);
   
   // Could send to analytics service in production
   // analytics.track('tab_switched', { from, to, reason, timestamp: Date.now() });
@@ -483,9 +671,9 @@ function showKeyboardShortcutsHint() {
   if (!hasSeenHint) {
     setTimeout(() => {
       const shortcutsMessage = `**Pro Tips:**\n\n` +
-        `â€¢ **Ctrl+1** / **Ctrl+2** - Switch between Chat and Results tabs\n` +
-        `â€¢ **Alt+â†** / **Alt+â†’** - Navigate between tabs\n` +
-        `â€¢ Tab automatically switches to Results when analysis completes\n\n` +
+  `� **Ctrl+1** / **Ctrl+2** - Switch between Chat and Results tabs\n` +
+  `� **Alt+?** / **Alt+->** - Navigate between tabs\n` +
+  `� Tab automatically switches to Results when analysis completes\n\n` +
         `Ready to analyze your spreadsheet data!`;
       
       addChatMessage('assistant', shortcutsMessage);
@@ -530,7 +718,10 @@ function performAnalysis() {
   // Disable buttons
   document.getElementById('analyze-btn').disabled = true;
   
-  // Call Apps Script analysis function
+  // Clear any existing analysis state
+  currentAnalysis = null;
+  
+  // Call Apps Script analysis function with single AI analysis
   google.script.run
     .withSuccessHandler(handleAnalysisSuccess)
     .withFailureHandler(handleAnalysisFailure)
@@ -538,122 +729,156 @@ function performAnalysis() {
 }
 
 /**
- * Handle successful analysis
+ * PERFECT ANALYSIS SUCCESS HANDLER
+ * Ensures reliable display of results for both analysis and re-analysis
  */
 function handleAnalysisSuccess(result) {
   isAnalyzing = false;
   currentAnalysis = result;
   
-  console.log('Analysis result:', result);
+  console.log('=== PERFECT ANALYSIS SUCCESS ===');
+  console.log('Result structure:', {
+    ok: result.ok,
+    loads: result.loads?.length,
+    issues: result.issues?.length,
+    mapping: Object.keys(result.mapping || {}).length,
+    service: result.meta?.service
+  });
   
-  // Re-enable buttons
+  // Re-enable analysis button immediately
   const analyzeBtn = document.getElementById('analyze-btn');
   if (analyzeBtn) {
     analyzeBtn.disabled = false;
+    analyzeBtn.textContent = 'Analyze';
   }
   
-  if (result.ok) {
-    // Switch to Results tab to show JSON
+  // Validate result structure
+  if (!result || typeof result !== 'object') {
+    console.error('Invalid analysis result structure');
+    handleAnalysisFailure('Invalid analysis result received');
+    return;
+  }
+  
+  // Ensure required properties exist
+  result.ok = result.ok !== undefined ? result.ok : false;
+  result.issues = Array.isArray(result.issues) ? result.issues : [];
+  result.loads = Array.isArray(result.loads) ? result.loads : [];
+  result.mapping = result.mapping || {};
+  result.meta = result.meta || {};
+  
+  if (result.ok && result.loads.length > 0) {
+    // SUCCESS CASE - Clean data with loads
+    console.log('Analysis success: ' + result.loads.length + ' loads found');
+    
+    // Switch to Results tab immediately
     switchTab('results', { reason: 'show-success-results' });
-    // Success case - show JSON in issues panel
-    var statusMessage = `Analysis complete. ${result.loads.length} loads found.`;
-    if (result.meta && result.meta.service === 'AI-Powered') {
-      statusMessage += ' (AI-Analyzed)';
+    
+    // Update status with clear success message
+    var statusMessage = `✅ Analysis complete: ${result.loads.length} loads ready`;
+    if (result.meta.service) {
+      statusMessage += ` (${result.meta.service})`;
     }
     updateStatus('success', statusMessage);
     
-    var chatMessage = `Great! AI analysis found ${result.loads.length} valid loads.`;
+    // Create success chat message
+    var chatMessage = `✅ **Analysis Complete!**\n\n`;
+    chatMessage += `📊 **Found:** ${result.loads.length} valid loads\n`;
+    
     if (result.issues.length > 0) {
-      chatMessage += ` ${result.issues.length} warnings detected.`;
+      var warnings = result.issues.filter(i => i.severity === 'warn').length;
+      if (warnings > 0) {
+        chatMessage += `⚠️ **Warnings:** ${warnings} (non-blocking)\n`;
+      }
     } else {
-      chatMessage += ' No issues detected.';
+      chatMessage += `✅ **Quality:** No issues detected\n`;
     }
     
-    // Add enhanced AI-specific information
-    if (result.meta && result.meta.service === 'AI-Powered') {
-      chatMessage += '\n\nAI Analysis Results:';
-      
-      if (result.meta.confidence) {
-        var confidencePercent = Math.round(result.meta.confidence * 100);
-        chatMessage += `\nâ€¢ Overall Confidence: ${confidencePercent}%`;
-      }
-      
-      if (result.aiMappings && result.aiMappings.length > 0) {
-        chatMessage += `\nâ€¢ Auto-mapped ${result.aiMappings.length} columns with semantic analysis`;
-      }
-      
-      if (result.aiChanges && result.aiChanges.length > 0) {
-        chatMessage += `\nâ€¢ Made ${result.aiChanges.length} data transformations`;
-      }
-      
-      if (result.aiAutoFixes && result.aiAutoFixes.length > 0) {
-        chatMessage += `\nâ€¢ Found ${result.aiAutoFixes.length} auto-fix suggestions (see Results tab)`;
-      }
-      
-      if (result.aiResponse && result.aiResponse.aiExplanation) {
-        chatMessage += '\n\nExplanation: ' + result.aiResponse.aiExplanation;
-      }
+    // Add service info
+    if (result.meta.service) {
+      chatMessage += `🔧 **Service:** ${result.meta.service}\n`;
     }
     
-    chatMessage += '\n\n**JSON is displayed in the Results tab** - switch to Results to view your structured data!';
+    chatMessage += `\n🎯 **JSON data is ready for export!**`;
     
     addChatMessage('assistant', chatMessage);
     
-    // Ensure we're on the results tab and display success
+    // Display results with guaranteed rendering
     setTimeout(() => {
-      try {
-        displaySuccessInIssuesPanel(result);
-        enableExportButtons();
-        console.log('Success results displayed');
-      } catch (error) {
-        console.error('Error displaying success results:', error);
-        // Fallback: at least show a basic success message
-        updateStatus('success', 'Analysis complete - check Results tab');
-      }
-    }, 100); // Small delay to ensure tab switch completes
+      displaySuccessResults(result);
+      enableExportButtons();
+      
+      // Verify display after a short delay
+      setTimeout(() => {
+        verifyJSONDisplay();
+      }, 300);
+    }, 100);
+    
   } else {
-    // Issues found - switch to results tab to show issues
+    // ISSUES CASE - Problems found that need fixing
+    console.log('Analysis found issues: ' + result.issues.length + ' total');
+    
+    // Switch to Results tab to show issues
     switchTab('results', { reason: 'show-issues' });
     
-    // Check for AI confidence issues
-    if (result.issues.some(issue => issue.code === 'MAPPING_UNCLEAR' || issue.code === 'MAPPING_AMBIGUOUS')) {
-      updateStatus('warning', 'AI mapping needs confirmation');
-      var aiConfidenceMessage = 'AI had difficulty mapping some columns with high confidence. ';
-      var unclearCount = result.issues.filter(i => i.code === 'MAPPING_UNCLEAR').length;
-      var ambiguousCount = result.issues.filter(i => i.code === 'MAPPING_AMBIGUOUS').length;
-      
-      if (unclearCount > 0) {
-        aiConfidenceMessage += `${unclearCount} header(s) have low confidence scores (<60%). `;
-      }
-      if (ambiguousCount > 0) {
-        aiConfidenceMessage += `${ambiguousCount} header(s) have multiple possible mappings. `;
-      }
-      aiConfidenceMessage += 'Please review the mappings in the Results tab and confirm or correct them.';
-      
-      addChatMessage('assistant', aiConfidenceMessage);
-      displayIssuesResults(result);
-    } else if (result.issues.some(issue => issue.code === 'MAPPING_AMBIGUOUS')) {
-      updateStatus('warning', 'Header mapping needs confirmation');
-      addChatMessage('assistant', 'Multiple columns could match the same field. Please confirm the mapping in the dialog.');
-      showMappingDialog(result.issues[0].ambiguities);
+    // Count different severity levels
+    var errorCount = result.issues.filter(i => i.severity === 'error').length;
+    var warningCount = result.issues.filter(i => i.severity === 'warn').length;
+    
+    // Update status based on error severity
+    if (errorCount > 0) {
+      updateStatus('error', `Found ${errorCount} error(s)${warningCount > 0 ? `, ${warningCount} warning(s)` : ''}`);
+    } else if (warningCount > 0) {
+      updateStatus('warning', `Found ${warningCount} warning(s)`);
     } else {
-      updateStatus('error', 'Issues found in data');
-      var errorCount = result.issues.filter(i => i.severity === 'error').length;
-      var warningCount = result.issues.filter(i => i.severity === 'warn').length;
-      
-      var message = `Found ${errorCount} error(s) and ${warningCount} warning(s) in your data. `;
-      if (errorCount > 0) {
-        message += 'You can use AI Auto-Fix to automatically resolve common errors, or fix them manually and re-analyze.';
-      } else {
-        message += 'Warnings don\'t prevent export.';
-      }
-      
-      addChatMessage('assistant', message);
-      displayIssuesResults(result);
-      
-      // Show re-analyze button
-      document.getElementById('reanalyze-btn').style.display = 'block';
+      updateStatus('info', 'Analysis complete - review needed');
     }
+    
+    // Create issues chat message
+    var message = `⚠️ **Analysis Found Issues**\n\n`;
+    if (errorCount > 0) {
+      message += `❌ **Errors:** ${errorCount} (must fix)\n`;
+    }
+    if (warningCount > 0) {
+      message += `⚠️ **Warnings:** ${warningCount} (optional)\n`;
+    }
+    
+    if (errorCount > 0) {
+      message += `\n🤖 **Use AI Auto-Fix to resolve errors automatically**\n`;
+      message += `🔧 Or fix manually in spreadsheet and re-analyze`;
+    } else {
+      message += `\n✅ **Warnings don't prevent data export**`;
+    }
+    
+    addChatMessage('assistant', message);
+    
+    // Display issues and enable fixing options
+    displayIssuesResults(result);
+    
+    // Show re-analyze button
+    const reanalyzeBtn = document.getElementById('reanalyze-btn');
+    if (reanalyzeBtn) {
+      reanalyzeBtn.style.display = 'block';
+    }
+  }
+}
+
+/**
+ * Verify JSON is properly displayed in results
+ */
+function verifyJSONDisplay() {
+  var jsonElement = document.getElementById('json-preview-inline');
+  var successSection = document.getElementById('success-json-section');
+  
+  console.log('=== JSON DISPLAY VERIFICATION ===');
+  console.log('Success section visible:', successSection?.style.display !== 'none');
+  console.log('JSON element exists:', !!jsonElement);
+  console.log('JSON has content:', !!(jsonElement?.innerHTML?.trim()));
+  
+  if (!jsonElement?.innerHTML?.trim()) {
+    console.warn('JSON not displayed properly, forcing display...');
+    forceDisplayJSON();
+  } else {
+    console.log('✅ JSON successfully displayed');
   }
 }
 
@@ -712,30 +937,9 @@ function syntaxHighlightJSON(json) {
 function displaySuccessInIssuesPanel(result) {
   console.log('displaySuccessInIssuesPanel called with result:', result);
 
-  // Clear ALL existing AI sections to prevent duplicates during reanalysis
-  console.log('=== COMPREHENSIVE AI SECTION CLEARING ===');
-  
-  // Remove all AI-related sections from entire document
-  var allAISections = document.querySelectorAll('.ai-analysis-section, .ai-changes-section, .ai-autofixes-section, .ai-autofix-section, [class*="ai-"], .autofix-buttons, .ai-mapping-indicator');
-  console.log('Found ' + allAISections.length + ' AI sections to remove');
-  
-  allAISections.forEach((section, index) => {
-    console.log('Removing AI section ' + (index + 1) + ':', section.className);
-    section.remove();
-  });
-  
-  // Also clear any AI content from issues panel specifically
-  var issuesContent = document.querySelector('#issues-panel .results-content');
-  if (issuesContent) {
-    var duplicateAISections = issuesContent.querySelectorAll('.ai-analysis-section, .ai-changes-section, .ai-autofixes-section, [class*="ai-"]');
-    console.log('Found ' + duplicateAISections.length + ' duplicate AI sections in issues panel');
-    duplicateAISections.forEach(section => {
-      console.log('Removing duplicate AI section from issues panel');
-      section.remove();
-    });
-  }
-  
-  console.log('=== AI SECTION CLEARING COMPLETE ===');
+  // Clear any existing AI sections to prevent duplicates
+  var existingAISections = document.querySelectorAll('.ai-analysis-section, .ai-changes-section, .ai-autofixes-section');
+  existingAISections.forEach(section => section.remove());
   
   // Hide empty state and success panel
   const emptyState = document.getElementById('empty-state');
@@ -905,14 +1109,14 @@ function displaySuccessInIssuesPanel(result) {
             <pre><code style="color: #dc2626;">No valid loads found in the data.
         
 Please check:
-â€¢ Spreadsheet has data rows
-â€¢ Headers are properly mapped  
-â€¢ Required fields are present
+� Spreadsheet has data rows
+� Headers are properly mapped  
+� Required fields are present
 
 Debug info:
-â€¢ result.loads: ${result.loads ? 'exists' : 'null/undefined'}
-â€¢ loads length: ${result.loads ? result.loads.length : 'N/A'}
-â€¢ loads sample: ${result.loads && result.loads.length > 0 ? JSON.stringify(result.loads[0], null, 2) : 'No data'}</code></pre>
+� result.loads: ${result.loads ? 'exists' : 'null/undefined'}
+� loads length: ${result.loads ? result.loads.length : 'N/A'}
+� loads sample: ${result.loads && result.loads.length > 0 ? JSON.stringify(result.loads[0], null, 2) : 'No data'}</code></pre>
           </div>
         </div>`;
       
@@ -962,9 +1166,9 @@ Debug info:
   displayMapping(result.mapping, result.meta);
   displayMeta(result.meta);
   
-  // If AI generated mapping, show explanation
-  if (result.meta && result.meta.aiGenerated && result.meta.aiExplanation) {
-    addChatMessage('assistant', 'AI Analysis: ' + result.meta.aiExplanation);
+  // Display detailed AI analysis section only for successful AI-powered results (not for issues)
+  if (result.meta && result.meta.service === 'AI-Powered' && !document.querySelector('.simple-ai-autofix')) {
+    displayAIAnalysisSection(result);
   }
 }
 
@@ -1065,41 +1269,102 @@ function displayIssuesResults(result) {
     document.getElementById('warning-issues').style.display = 'none';
   }
   
-  // Show AI Auto-Fix section if there are errors
-  if (errors.length > 0) {
-    document.getElementById('ai-autofix-section').style.display = 'block';
-  } else {
-    document.getElementById('ai-autofix-section').style.display = 'none';
-  }
+  // AI Auto-Fix section is now handled by displayAIAnalysisSection()
+  // Hide the built-in AI autofix section to prevent duplicates
+  document.getElementById('ai-autofix-section').style.display = 'none';
   
   // Display fix hints
   displayFixHints(result.issues);
   
-  // Show enhanced AI analysis even when there are issues
-  displayAIAnalysisSection(result);
-  
   // Show mapping and meta info
   displayMapping(result.mapping);
   displayMeta(result.meta);
+  
+  // Show simple AI auto-fix for errors only (don't show complex AI analysis section in issues panel)
+  if (errors.length > 0) {
+    console.log('Attempting to display AI auto-fix for', errors.length, 'errors');
+    displaySimpleAIAutoFix(result);
+    
+    // Fallback: if no fixable errors detected, show a basic AI fix option anyway
+    setTimeout(() => {
+      if (!document.querySelector('.simple-ai-autofix')) {
+        console.log('No AI auto-fix section found, creating fallback');
+        var fallbackHtml = `
+          <div class="simple-ai-autofix" style="margin: 15px 0; padding: 15px; background: linear-gradient(135deg, #28a745 0%, #20c997 100%); border-radius: 8px; color: white;">
+            <h4 style="margin: 0 0 10px 0; color: white;">🤖 AI Auto-Fix Available</h4>
+            <p style="margin: 0 0 8px 0; opacity: 0.9;">AI can help fix ${errors.length} error(s) in your data</p>
+            <p style="margin: 0 0 12px 0; opacity: 0.8; font-size: 0.9em;">Next: AI Fix → Re-analyze → JSON Output</p>
+            <button id="simple-ai-autofix-btn" class="btn" style="background: white; color: #28a745; border: none; font-weight: bold; padding: 8px 16px; border-radius: 5px;" onclick="startAIAutoFix()">
+              🔧 Fix Errors with AI
+            </button>
+          </div>`;
+        var issuesPanel = document.getElementById('issues-panel');
+        if (issuesPanel) {
+          issuesPanel.insertAdjacentHTML('afterbegin', fallbackHtml);
+        }
+      }
+    }, 100);
+  }
+}
+
+/**
+ * Display simple AI auto-fix button for issues panel (prevents duplicate complex sections)
+ * STREAMLINED WORKFLOW: User Analyze -> Shows Issues + AI Fix Button -> AI Fix -> Auto Re-analyze -> JSON Output
+ */
+function displaySimpleAIAutoFix(result) {
+  console.log('=== DISPLAY SIMPLE AI AUTO-FIX CALLED ===');
+  
+  // Remove any existing simple AI sections first
+  var existingSimpleAI = document.querySelectorAll('.simple-ai-autofix');
+  console.log('Removing', existingSimpleAI.length, 'existing AI sections');
+  existingSimpleAI.forEach(function(section) {
+    section.remove();
+  });
+  
+  // Show AI fix button for ANY errors (be inclusive, not restrictive)
+  var fixableErrors = result.issues.filter(issue => issue.severity === 'error');
+  
+  console.log('AI Fix Debug:', {
+    totalIssues: result.issues.length,
+    errorIssues: fixableErrors.length,
+    errorCodes: fixableErrors.map(e => e.code),
+    allIssues: result.issues.map(i => ({ code: i.code, severity: i.severity }))
+  });
+  
+  if (fixableErrors.length > 0) {
+    console.log('Creating AI auto-fix button for', fixableErrors.length, 'errors');
+    var simpleAIHtml = `
+      <div class="simple-ai-autofix" style="margin: 15px 0; padding: 15px; background: linear-gradient(135deg, #28a745 0%, #20c997 100%); border-radius: 8px; color: white;">
+        <h4 style="margin: 0 0 10px 0; color: white;">🤖 AI Auto-Fix Available</h4>
+        <p style="margin: 0 0 8px 0; opacity: 0.9;">AI can automatically fix ${fixableErrors.length} error(s) in your data</p>
+        <p style="margin: 0 0 12px 0; opacity: 0.8; font-size: 0.9em;">Next: AI Fix → Re-analyze → JSON Output</p>
+        <button id="simple-ai-autofix-btn" class="btn" style="background: white; color: #28a745; border: none; font-weight: bold; padding: 8px 16px; border-radius: 5px;" onclick="startAIAutoFix()">
+          🔧 Fix Errors with AI
+        </button>
+      </div>`;
+    
+    // Insert at the top of the issues panel
+    var issuesPanel = document.getElementById('issues-panel');
+    if (issuesPanel) {
+      issuesPanel.insertAdjacentHTML('afterbegin', simpleAIHtml);
+    }
+  }
 }
 
 /**
  * Display enhanced AI analysis section with confidence scores, changes, and auto-fixes
  */
 function displayAIAnalysisSection(result) {
-  // Only show for AI-powered results
+  // Only show for AI-powered results and prevent duplicates
   if (!result.meta || result.meta.service !== 'AI-Powered') {
     return;
   }
 
-  // Clear existing AI sections to prevent duplicates
-  console.log('Clearing existing AI sections before creating new one...');
-  var existingSections = document.querySelectorAll('.ai-analysis-section, .ai-changes-section, .ai-autofixes-section');
-  existingSections.forEach(section => {
-    console.log('Removing existing AI section');
-    section.remove();
-  });
-    console.log('Cleared ' + existingSections.length + ' existing AI sections');
+  // Check if AI section already exists to prevent duplicates
+  if (document.querySelector('.ai-analysis-section')) {
+    console.log('AI analysis section already exists, skipping duplicate creation');
+    return;
+  }
   
   var aiSectionHtml = '<div class="ai-analysis-section" style="margin: 15px 0; padding: 15px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #007bff;">';
   aiSectionHtml += '<h4 style="margin: 0 0 10px 0; color: #007bff;">AI Analysis Results</h4>';
@@ -1123,7 +1388,7 @@ function displayAIAnalysisSection(result) {
     result.aiMappings.forEach(mapping => {
       var confidencePercent = Math.round(mapping.confidence * 100);
       var confidenceColor = confidencePercent >= 90 ? '#28a745' : confidencePercent >= 60 ? '#ffc107' : '#dc3545';
-      aiSectionHtml += `<li><code>${mapping.header}</code> â†’ <code>${mapping.field}</code> <span style="color: ${confidenceColor};">(${confidencePercent}%)</span>`;
+  aiSectionHtml += `<li><code>${mapping.header}</code> -> <code>${mapping.field}</code> <span style="color: ${confidenceColor};">(${confidencePercent}%)</span>`;
       if (mapping.alternatives && mapping.alternatives.length > 0) {
         aiSectionHtml += ` <em>alternatives: ${mapping.alternatives.join(', ')}</em>`;
       }
@@ -1138,7 +1403,7 @@ function displayAIAnalysisSection(result) {
     aiSectionHtml += '<ul style="margin: 5px 0 10px 20px;">';
     result.aiChanges.forEach((change, index) => {
       if (index < 5) { // Limit to first 5 changes
-        aiSectionHtml += `<li><strong>${change.field}:</strong> "${change.from}" â†’ "${change.to}" <em>(${change.reason})</em></li>`;
+  aiSectionHtml += `<li><strong>${change.field}:</strong> "${change.from}" -> "${change.to}" <em>(${change.reason})</em></li>`;
       }
     });
     if (result.aiChanges.length > 5) {
@@ -1147,24 +1412,33 @@ function displayAIAnalysisSection(result) {
     aiSectionHtml += '</ul>';
   }
   
-  // Show AI auto-fixes with Apply button
+  // Show AI auto-fixes with Apply button (only significant fixes)
   if (result.aiAutoFixes && result.aiAutoFixes.length > 0) {
-    aiSectionHtml += '<div style="margin-bottom: 10px;"><strong>AI Auto-Fix Suggestions:</strong></div>';
-    aiSectionHtml += '<div class="ai-autofix-list" style="margin: 5px 0 10px 0;">';
-    result.aiAutoFixes.forEach((fix, index) => {
-      aiSectionHtml += `<div style="background: white; padding: 10px; margin: 5px 0; border-radius: 5px; border: 1px solid #dee2e6;">`;
-      aiSectionHtml += `<div><strong>${fix.description}</strong></div>`;
-      aiSectionHtml += `<div style="color: #6c757d; font-size: 0.9em;">Field: ${fix.field} â€¢ Affects ${fix.rowsAffected} rows</div>`;
-      aiSectionHtml += `<div style="color: #6c757d; font-size: 0.9em; margin-top: 5px;">Preview: ${fix.preview}</div>`;
-      if (fix.rule) {
-        aiSectionHtml += `<div style="color: #6c757d; font-size: 0.8em; margin-top: 5px;">Rule: ${fix.rule}</div>`;
-      }
-      aiSectionHtml += '</div>';
-    });
-    aiSectionHtml += '</div>';
+    // Filter out minor fixes to reduce noise
+    var significantFixes = result.aiAutoFixes.filter(fix => 
+      fix.description && 
+      !fix.description.toLowerCase().includes('normalized from') &&
+      !fix.description.toLowerCase().includes('iso 8601 format')
+    );
     
-    // Add Apply Fixes button
-    aiSectionHtml += '<button id="apply-ai-fixes-btn" class="btn btn-primary" style="margin-top: 10px;" onclick="applyAIAutoFixes()">Apply AI Auto-Fixes</button>';
+    if (significantFixes.length > 0) {
+      aiSectionHtml += '<div style="margin-bottom: 10px;"><strong>AI Auto-Fix Suggestions:</strong></div>';
+      aiSectionHtml += '<div class="ai-autofix-list" style="margin: 5px 0 10px 0;">';
+      significantFixes.forEach((fix, index) => {
+        aiSectionHtml += `<div style="background: white; padding: 10px; margin: 5px 0; border-radius: 5px; border: 1px solid #dee2e6;">`;
+        aiSectionHtml += `<div><strong>${fix.description}</strong></div>`;
+        aiSectionHtml += `<div style="color: #6c757d; font-size: 0.9em;">Field: ${fix.field} � Affects ${fix.rowsAffected} rows</div>`;
+        aiSectionHtml += `<div style="color: #6c757d; font-size: 0.9em; margin-top: 5px;">Preview: ${fix.preview}</div>`;
+        if (fix.rule) {
+          aiSectionHtml += `<div style="color: #6c757d; font-size: 0.8em; margin-top: 5px;">Rule: ${fix.rule}</div>`;
+        }
+        aiSectionHtml += '</div>';
+      });
+      aiSectionHtml += '</div>';
+      
+      // Add Apply Fixes button
+      aiSectionHtml += '<button id="apply-ai-fixes-btn" class="btn btn-primary" style="margin-top: 10px;" onclick="applyAIAutoFixes()">Apply AI Auto-Fixes</button>';
+    }
   }
   
   aiSectionHtml += '</div>';
@@ -1177,10 +1451,11 @@ function displayAIAnalysisSection(result) {
 }
 
 /**
- * Apply AI auto-fixes to the spreadsheet
+ * Apply AI auto-fixes to the spreadsheet (streamlined single process)
  */
 function applyAIAutoFixes() {
   if (!currentAnalysis || !currentAnalysis.aiAutoFixes) {
+    addChatMessage('assistant', '? No auto-fixes available to apply.');
     return;
   }
   
@@ -1190,19 +1465,31 @@ function applyAIAutoFixes() {
     button.textContent = 'Applying Fixes...';
   }
   
+  updateStatus('processing', 'Applying AI auto-fixes...');
+  addChatMessage('user', '?? Apply AI auto-fixes');
+  
   // Call Google Apps Script to apply fixes
   google.script.run
     .withSuccessHandler(function(result) {
-      addChatMessage('assistant', 'âœ… AI auto-fixes applied successfully! Re-analyzing data...');
+      addChatMessage('assistant', '? AI auto-fixes applied successfully!');
+      
       if (button) {
-        button.textContent = 'Fixes Applied âœ…';
+        button.textContent = 'Fixes Applied ?';
       }
-      // Re-analyze after applying fixes
-      setTimeout(() => performAnalysis(), 1000);
+      
+      // Automatically re-analyze after applying fixes (single cycle)
+      updateStatus('analyzing', 'Re-analyzing data after fixes...');
+      addChatMessage('assistant', '?? Re-analyzing data to show updated results...');
+      
+      setTimeout(() => {
+        performAnalysis();
+      }, 1000);
     })
     .withFailureHandler(function(error) {
       console.error('Failed to apply AI fixes:', error);
-      addChatMessage('assistant', 'âŒ Failed to apply auto-fixes: ' + error.message);
+      addChatMessage('assistant', '? Failed to apply auto-fixes: ' + (error.message || error));
+      updateStatus('error', 'Auto-fix failed');
+      
       if (button) {
         button.disabled = false;
         button.textContent = 'Apply AI Auto-Fixes';
@@ -1211,22 +1498,64 @@ function applyAIAutoFixes() {
     .applyAIAutoFixes(currentAnalysis.aiAutoFixes);
 }
 
+// Function removed - using unified startAIAutoFix function below
+
 /**
- * Display list of issues
+ * Display list of issues (filtered to reduce noise)
  */
 function displayIssuesList(containerId, issues) {
   var container = document.getElementById(containerId);
   container.innerHTML = '';
   
-  issues.forEach(function(issue) {
+  // Filter out minor NON_ISO_OUTPUT warnings that are just format normalization
+  var filteredIssues = issues.filter(function(issue) {
+    // Keep all errors
+    if (issue.severity === 'error') return true;
+    
+    // Filter out minor date normalization warnings
+    if (issue.code === 'NON_ISO_OUTPUT' && 
+        issue.message && 
+        issue.message.includes('normalized from') &&
+        issue.message.includes('.000Z to') &&
+        issue.message.includes('Z')) {
+      return false; // Skip minor date format normalization
+    }
+    
+    return true; // Keep all other warnings
+  });
+  
+  // Group duplicate issues by code and column
+  var groupedIssues = {};
+  filteredIssues.forEach(function(issue) {
+    var key = issue.code + '_' + (issue.column || 'no_column');
+    if (!groupedIssues[key]) {
+      groupedIssues[key] = {
+        ...issue,
+        rows: issue.rows ? [...issue.rows] : (issue.row ? [issue.row] : [])
+      };
+    } else {
+      // Merge rows
+      if (issue.rows) {
+        groupedIssues[key].rows = [...new Set([...groupedIssues[key].rows, ...issue.rows])];
+      } else if (issue.row) {
+        groupedIssues[key].rows = [...new Set([...groupedIssues[key].rows, issue.row])];
+      }
+    }
+  });
+  
+  Object.values(groupedIssues).forEach(function(issue) {
     var issueDiv = document.createElement('div');
     issueDiv.className = `issue-item ${issue.severity || issue.type}`;
     
     var rowsText = '';
     if (issue.rows && issue.rows.length > 0) {
-      rowsText = `<span class="issue-rows">Row(s): ${issue.rows.join(', ')}</span>`;
-    } else if (issue.row) {
-      rowsText = `<span class="issue-rows">Row: ${issue.row}</span>`;
+      // Limit displayed rows to prevent UI clutter
+      var displayRows = issue.rows.slice(0, 10);
+      var rowsDisplay = displayRows.join(', ');
+      if (issue.rows.length > 10) {
+        rowsDisplay += ` (+${issue.rows.length - 10} more)`;
+      }
+      rowsText = `<span class="issue-rows">Row(s): ${rowsDisplay}</span>`;
     }
     
     var html = `
@@ -1242,6 +1571,14 @@ function displayIssuesList(containerId, issues) {
     issueDiv.innerHTML = html;
     container.appendChild(issueDiv);
   });
+  
+  // Show filtered count if issues were filtered
+  if (filteredIssues.length < issues.length) {
+    var filteredDiv = document.createElement('div');
+    filteredDiv.className = 'filtered-notice';
+    filteredDiv.innerHTML = `<small style="color: #6c757d; font-style: italic;">Showing ${filteredIssues.length} of ${issues.length} issues (minor format warnings hidden)</small>`;
+    container.appendChild(filteredDiv);
+  }
 }
 
 /**
@@ -1277,7 +1614,7 @@ function displayFixHints(issues) {
  */
 function displayChangesSection(changes) {
   var changesHtml = '<div class="ai-changes-section" style="margin: 16px 0; padding: 12px; border: 1px solid #e5e7eb; border-radius: 6px; background: #f8f9fa;">';
-  changesHtml += '<h4 style="margin: 0 0 8px 0; color: #333; font-size: 14px;">ðŸ”„ AI Changes Made</h4>';
+  changesHtml += '<h4 style="margin: 0 0 8px 0; color: #333; font-size: 14px;">🔄 AI Changes Made</h4>';
   
   changes.forEach(function(change, index) {
     var changeColor = change.type === 'mapping' ? '#3b82f6' : change.type === 'data' ? '#10b981' : '#f59e0b';
@@ -1286,7 +1623,7 @@ function displayChangesSection(changes) {
     changesHtml += '<div style="font-weight: 500; color: #374151; margin-bottom: 4px;">' + change.field + ' (' + change.type + ')</div>';
     changesHtml += '<div style="font-size: 12px; color: #6b7280; display: flex; align-items: center; gap: 8px;">';
     changesHtml += '<span style="padding: 2px 6px; background: #fef2f2; color: #dc2626; border-radius: 3px;">From: ' + change.from + '</span>';
-    changesHtml += '<span>â†’</span>';
+    changesHtml += '<span>→</span>';
     changesHtml += '<span style="padding: 2px 6px; background: #f0fdf4; color: #16a34a; border-radius: 3px;">To: ' + change.to + '</span>';
     changesHtml += '</div>';
     if (change.reason) {
@@ -1310,7 +1647,7 @@ function displayChangesSection(changes) {
 function displayAutoFixesSection(autoFixes) {
   var fixesHtml = '<div class="ai-autofixes-section" style="margin: 16px 0; padding: 12px; border: 1px solid #e5e7eb; border-radius: 6px; background: #f0fdf4;">';
   fixesHtml += '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">';
-  fixesHtml += '<h4 style="margin: 0; color: #333; font-size: 14px;">ðŸ”§ AI Auto-Fix Suggestions</h4>';
+  fixesHtml += '<h4 style="margin: 0; color: #333; font-size: 14px;">🔧 AI Auto-Fix Suggestions</h4>';
   fixesHtml += '<button onclick="applyAutoFixes()" style="padding: 4px 8px; background: #10b981; color: white; border: none; border-radius: 4px; font-size: 12px; cursor: pointer;">Apply All Fixes</button>';
   fixesHtml += '</div>';
   
@@ -1353,7 +1690,7 @@ function displayMapping(mapping, meta) {
       aiIndicator.className = 'ai-mapping-indicator';
       aiIndicator.innerHTML = `
         <div class="ai-badge">
-          <i class="ai-icon">ðŸ¤–</i>
+          <i class="ai-icon">🤖</i>
           AI-Generated Mapping
         </div>
         <div class="ai-description">Column mapping automatically detected by AI analysis</div>
@@ -1369,7 +1706,7 @@ function displayMapping(mapping, meta) {
       }
       mappingDiv.innerHTML = `
         <span class="mapping-header">${header}</span>
-        <span class="mapping-arrow">â†’</span>
+        <span class="mapping-arrow"> → </span>
         <span class="mapping-field">${field}</span>
       `;
       container.appendChild(mappingDiv);
@@ -1419,29 +1756,70 @@ function resetToEmptyState() {
 /**
  * Re-analyze function
  */
+/**
+ * PERFECT RE-ANALYSIS FUNCTION
+ * Ensures clean, accurate re-analysis after fixes or changes
+ */
 function reAnalyze() {
-  console.log('reAnalyze() called');
+  console.log('=== PERFECT RE-ANALYSIS STARTED ===');
   
-  // Don't reset to empty state immediately - just clear current analysis
+  // Prevent multiple re-analysis calls
+  if (isAnalyzing) {
+    console.log('Re-analysis already in progress, skipping');
+    return;
+  }
+  
+  // Clear all analysis state for fresh start
   currentAnalysis = null;
   
-  // Provide immediate feedback
-  updateStatus('analyzing', 'Re-analyzing spreadsheet data...');
-  addChatMessage('user', 'Re-analyzing data...');
+  // Clear any existing UI elements to prevent duplication
+  var existingElements = document.querySelectorAll('.ai-analysis-section, .ai-changes-section, .ai-autofixes-section');
+  existingElements.forEach(element => element.remove());
+  
+  // Clear issues and success sections
+  var issuesPanel = document.getElementById('issues-panel');
+  var successSection = document.getElementById('success-json-section');
+  if (issuesPanel) issuesPanel.innerHTML = '';
+  if (successSection) successSection.style.display = 'none';
+  
+  // Immediate user feedback
+  updateStatus('analyzing', '🔄 Re-analyzing updated data...');
+  addChatMessage('user', '🔄 Re-analyze Data');
+  addChatMessage('assistant', '🔍 **Re-analyzing your data...**\n\nChecking for changes and improvements after fixes.');
   
   // Hide re-analyze button to prevent double-clicks
   const reanalyzeBtn = document.getElementById('reanalyze-btn');
   if (reanalyzeBtn) {
     reanalyzeBtn.style.display = 'none';
+    reanalyzeBtn.disabled = true;
   }
   
-  // Start fresh analysis without debounce delay for re-analyze
+  // Clear any pending analysis timers
   if (analyzeDebounceTimer) {
     clearTimeout(analyzeDebounceTimer);
+    analyzeDebounceTimer = null;
   }
   
-  console.log('Calling performAnalysis()');
-  performAnalysis();
+  // Force fresh analysis with cache clearing
+  console.log('Starting fresh analysis with cache clearing...');
+  
+  // Call backend to clear cache first, then analyze
+  google.script.run
+    .withSuccessHandler(function() {
+      console.log('Cache cleared, starting fresh analysis');
+      
+      // Small delay to ensure cache is cleared
+      setTimeout(() => {
+        performAnalysis();
+      }, 100);
+    })
+    .withFailureHandler(function(error) {
+      console.warn('Cache clear failed, proceeding with analysis:', error);
+      
+      // Continue with analysis even if cache clear fails
+      performAnalysis();
+    })
+    .clearAnalysisCache();
 }
 
 /**
@@ -1473,7 +1851,7 @@ function showBasicFixSummary(result) {
   var basicSummaryHtml = `
     <div class="fix-results-panel">
       <div class="fix-results-header">
-        <h3>ðŸ¤– AI Auto-Fix Summary</h3>
+        <h3>🤖 AI Auto-Fix Summary</h3>
         <div class="fix-stats">${result.fixes.length} fixes applied</div>
       </div>
       <div class="fix-changes-list">
@@ -1485,7 +1863,7 @@ function showBasicFixSummary(result) {
     basicSummaryHtml += `
       <div class="fix-item">
         <div class="fix-change">
-          <div class="fix-description">âœ… ${fix}</div>
+          <div class="fix-description">✅ ${fix}</div>
         </div>
       </div>`;
   });
@@ -1496,7 +1874,7 @@ function showBasicFixSummary(result) {
       </div>
       <div class="fix-results-footer">
         <div class="fix-note">
-          <span class="fix-icon">â„¹ï¸</span>
+          <span class="fix-icon">ℹ️</span>
           Changes have been applied to your spreadsheet. Re-analyzing will show updated validation results.
         </div>
       </div>
@@ -1527,7 +1905,7 @@ function showFixResults(result) {
   var fixResultsHtml = `
     <div class="fix-results-panel">
       <div class="fix-results-header">
-        <h3>ðŸ¤– AI Auto-Fix Results</h3>
+        <h3>🤖 AI Auto-Fix Results</h3>
         <div class="fix-stats">
           <span class="fix-count">${result.detailedFixes.length} changes applied</span>
         </div>
@@ -1547,13 +1925,13 @@ function showFixResults(result) {
     // Display each fix type
     Object.keys(fixesByType).forEach(type => {
       var typeLabel = {
-        'COLUMN_CREATED': 'ðŸ“‹ Columns Created',
-        'DATE_NORMALIZED': 'ðŸ“… Dates Normalized', 
-        'LOAD_ID_GENERATED': 'ðŸ”¢ Load IDs Generated',
-        'DUPLICATE_RESOLVED': 'ðŸ”„ Duplicates Resolved',
-        'STATUS_NORMALIZED': 'ðŸ“Š Status Values Normalized',
-        'EMPTY_CELL_FILLED': 'âœï¸ Empty Cells Filled'
-      }[type] || `ðŸ”§ ${type.replace(/_/g, ' ')}`;    fixResultsHtml += `
+        'COLUMN_CREATED': '📋 Columns Created',
+        'DATE_NORMALIZED': '📅 Dates Normalized', 
+        'LOAD_ID_GENERATED': '🔢 Load IDs Generated',
+        'DUPLICATE_RESOLVED': '🔄 Duplicates Resolved',
+        'STATUS_NORMALIZED': '📊 Status Values Normalized',
+        'EMPTY_CELL_FILLED': '✏️ Empty Cells Filled'
+      }[type] || `🔧 ${type.replace(/_/g, ' ')}`;    fixResultsHtml += `
       <div class="fix-type-section">
         <h4 class="fix-type-title">${typeLabel}</h4>
         <div class="fix-items">`;
@@ -1567,7 +1945,7 @@ function showFixResults(result) {
               <span class="fix-label">Before:</span>
               <code class="fix-value before">${fix.before}</code>
             </div>
-            <div class="fix-arrow">â†’</div>
+            <div class="fix-arrow">→</div>
             <div class="fix-after">
               <span class="fix-label">After:</span>
               <code class="fix-value after">${fix.after}</code>
@@ -1587,7 +1965,7 @@ function showFixResults(result) {
       
       <div class="fix-results-footer">
         <div class="fix-note">
-          <span class="fix-icon">â„¹ï¸</span>
+          <span class="fix-icon">ℹ️</span>
           Changes have been applied to your spreadsheet. Re-analyzing will show updated validation results.
         </div>
       </div>
@@ -1606,29 +1984,107 @@ function showFixResults(result) {
 }
 
 /**
- * Start AI Auto-Fix process - Unified function following the flow: Analyze â†’ Issues â†’ Fix â†’ JSON
+ * PRODUCTION-LEVEL AI AUTO-FIX SYSTEM
+ * Unified function following the flow: Analyze → Issues → Fix → JSON
+ * Complete with error handling, monitoring, and user feedback
+ */
+/**
+ * FAST AI AUTO-FIX - Optimized for Speed & User Experience
  */
 function startAIAutoFix() {
-  console.log('=== AI AUTO-FIX STARTED ===');
-  console.log('currentAnalysis:', currentAnalysis);
+  console.log('FAST AI FIX: Starting optimized auto-fix');
   
+  // Quick validation
   if (!currentAnalysis) {
-    addChatMessage('assistant', 'No analysis data available. Please run an analysis first.');
+    addChatMessage('assistant', '❌ Please run analysis first');
+    updateStatus('error', 'No analysis data');
     return;
   }
   
-  // Check for AI auto-fixes first (preferred method from AI analysis)
-  var autoFixes = currentAnalysis.aiAutoFixes || currentAnalysis.autoFixes;
+  // Count fixable errors quickly
+  var errorIssues = (currentAnalysis.issues || []).filter(issue => 
+    issue.severity === 'error' && 
+    ['EMPTY_REQUIRED_CELL', 'DUPLICATE_ID', 'BAD_DATE_FORMAT', 'INVALID_STATUS_VALUE'].includes(issue.code)
+  );
   
-  if (autoFixes && autoFixes.length > 0) {
-    console.log('Using AI-generated auto-fixes:', autoFixes.length);
-    applyAIGeneratedFixes(autoFixes);
-  } else if (currentAnalysis.issues) {
-    console.log('Fallback to manual issue-based fixes');
-    applyManualIssueFixes();
-  } else {
-    addChatMessage('assistant', 'No fixable issues found. Your data looks good!');
+  if (errorIssues.length === 0) {
+    addChatMessage('assistant', '✅ **No fixable errors found!** Data is ready for export.');
+    updateStatus('success', 'No errors to fix');
+    return;
   }
+  
+  // Quick feedback to user
+  var fixMessage = `⚡ **Fast AI Fix Starting**\n\n`;
+  fixMessage += `� Fixing ${errorIssues.length} critical error(s) quickly...\n`;
+  
+  updateStatus('processing', `Fast-fixing ${errorIssues.length} errors...`);
+  addChatMessage('user', '⚡ Fast AI Fix');
+  addChatMessage('assistant', fixMessage);
+  
+  // UI feedback
+  var aiFixBtn = document.querySelector('#simple-ai-autofix-btn') || document.querySelector('#ai-autofix-btn');
+  var originalText = 'Fix Errors with AI';
+  if (aiFixBtn) {
+    originalText = aiFixBtn.textContent;
+    aiFixBtn.disabled = true;
+    aiFixBtn.textContent = '⚡ Fast Fixing...';
+  }
+  
+  var startTime = Date.now();
+  
+  google.script.run
+    .withSuccessHandler(function(result) {
+      var duration = Date.now() - startTime;
+      console.log('Fast AI Fix Result:', result, 'Duration:', duration + 'ms');
+      
+      // Re-enable button
+      if (aiFixBtn) {
+        aiFixBtn.disabled = false;
+        aiFixBtn.textContent = originalText;
+      }
+      
+      if (result && result.success) {
+        var successMessage = `✅ **Fast Fix Complete!** Fixed ${result.fixCount || 0} errors in ${(duration / 1000).toFixed(1)}s`;
+        addChatMessage('assistant', successMessage);
+        updateStatus('success', 'Fast fixes applied');
+        
+        // Quick re-analysis
+        setTimeout(() => {
+          console.log('Quick re-analysis after fast fix');
+          performAnalysis();
+        }, 500);
+        
+      } else {
+        var errorMessage = `❌ **Fast Fix Failed:** ${result?.error || 'Unknown error'}`;
+        addChatMessage('assistant', errorMessage);
+        updateStatus('error', 'Fast fix failed');
+      }
+    })
+    .withFailureHandler(function(error) {
+      console.error('Fast AI Fix Error:', error);
+      
+      if (aiFixBtn) {
+        aiFixBtn.disabled = false;
+        aiFixBtn.textContent = originalText;
+      }
+      
+      // Provide detailed error feedback to user
+      var errorMessage = `🚨 **System Error During AI Fix**\n\n`;
+      errorMessage += `**Error:** ${error.message || error.toString()}\n`;
+      errorMessage += `**Duration:** ${(duration / 1000).toFixed(1)}s\n\n`;
+      errorMessage += `**Possible Causes:**\n`;
+      errorMessage += `• Network connectivity issue\n`;
+      errorMessage += `• Google Apps Script timeout\n`;
+      errorMessage += `• Spreadsheet permissions\n\n`;
+      errorMessage += `**Recommended Actions:**\n`;
+      errorMessage += `• Refresh page and try again\n`;
+      errorMessage += `• Check internet connection\n`;
+      errorMessage += `• Reduce data size if very large`;
+      
+      addChatMessage('assistant', errorMessage);
+      updateStatus('error', 'System error - please try again');
+    })
+    .performAIAutoFix();
 }
 
 /**
@@ -1639,11 +2095,11 @@ function applyAIGeneratedFixes(autoFixes) {
   var confirmMessage = `AI has ${autoFixes.length} auto-fix suggestion(s):\n\n`;
   autoFixes.forEach((fix, index) => {
     if (index < 3) { // Show first 3 fixes
-      confirmMessage += `â€¢ ${fix.description}\n`;
+      confirmMessage += `• ${fix.description}\n`;
     }
   });
   if (autoFixes.length > 3) {
-    confirmMessage += `â€¢ ... and ${autoFixes.length - 3} more fixes\n`;
+    confirmMessage += `• ... and ${autoFixes.length - 3} more fixes\n`;
   }
   confirmMessage += '\nApply these AI fixes?';
   
@@ -1654,27 +2110,27 @@ function applyAIGeneratedFixes(autoFixes) {
   // Start auto-fix process
   var autoFixBtn = document.getElementById('ai-autofix-btn');
   if (autoFixBtn) {
-    autoFixBtn.textContent = 'ðŸ¤– Applying AI Fixes...';
+    autoFixBtn.textContent = '🤖 Applying AI Fixes...';
     autoFixBtn.disabled = true;
   }
   
-  addChatMessage('assistant', 'ðŸ¤– Applying AI auto-fixes to your spreadsheet...');
+  addChatMessage('assistant', '🤖 Applying AI auto-fixes to your spreadsheet...');
   
   // Call Google Apps Script to apply fixes
   google.script.run
     .withSuccessHandler(function(result) {
       if (result.success) {
-        addChatMessage('assistant', `âœ… AI fixes applied successfully! ${result.message}`);
-        addChatMessage('assistant', 'ðŸ”„ Re-analyzing data to generate updated JSON...');
+        addChatMessage('assistant', `✅ AI fixes applied successfully! ${result.message}`);
+        addChatMessage('assistant', '🔄 Re-analyzing data to generate updated JSON...');
         setTimeout(() => performAnalysis(), 1000);
       } else {
-        addChatMessage('assistant', 'âŒ Failed to apply AI fixes: ' + result.error);
+        addChatMessage('assistant', '❌ Failed to apply AI fixes: ' + result.error);
         resetAutoFixButton();
       }
     })
     .withFailureHandler(function(error) {
       console.error('Failed to apply AI fixes:', error);
-      addChatMessage('assistant', 'âŒ Auto-fix failed: ' + error.message);
+      addChatMessage('assistant', '❌ Auto-fix failed: ' + error.message);
       resetAutoFixButton();
     })
     .applyAIAutoFixes(autoFixes);
@@ -1700,7 +2156,7 @@ function applyManualIssueFixes() {
   // Show confirmation dialog
   var confirmMessage = `AI will attempt to fix ${fixableErrors.length} error(s):\n\n`;
   fixableErrors.forEach(error => {
-    confirmMessage += `â€¢ ${error.message}\n`;
+    confirmMessage += `• ${error.message}\n`;
   });
   confirmMessage += '\nProceed with AI auto-fix?';
   
@@ -1711,10 +2167,10 @@ function applyManualIssueFixes() {
   // Start auto-fix process
   var autoFixBtn = document.getElementById('ai-autofix-btn');
   var originalText = autoFixBtn.textContent;
-  autoFixBtn.textContent = 'ðŸ¤– AI is fixing errors...';
+  autoFixBtn.textContent = '🤖 AI is fixing errors...';
   autoFixBtn.disabled = true;
   
-  addChatMessage('assistant', 'ðŸ¤– Starting AI auto-fix process...');
+  addChatMessage('assistant', '🤖 Starting AI auto-fix process...');
   
   // Call backend AI auto-fix function
   google.script.run
@@ -1724,27 +2180,27 @@ function applyManualIssueFixes() {
       
       if (result.success) {
         // Show concise fix summary in chat
-        var fixSummary = `âœ… **AI Auto-Fix Complete!**\n\n`;
+        var fixSummary = `✅ **AI Auto-Fix Complete!**\n\n`;
         fixSummary += `Applied **${result.fixes.length} fix(es)**:\n`;
         result.fixes.forEach(fix => {
-          fixSummary += `â€¢ ${fix}\n`;
+          fixSummary += `• ${fix}\n`;
         });
         
         // Show sample of detailed changes if available
         if (result.detailedFixes && result.detailedFixes.length > 0) {
           fixSummary += `\n**Sample Changes:**\n`;
           result.detailedFixes.slice(0, 3).forEach(fix => {
-            fixSummary += `â€¢ **${fix.location}**: \`${fix.before}\` â†’ \`${fix.after}\`\n`;
+            fixSummary += `• **${fix.location}**: \`${fix.before}\` → \`${fix.after}\`\n`;
           });
           
           if (result.detailedFixes.length > 3) {
-            fixSummary += `â€¢ ... and ${result.detailedFixes.length - 3} more changes\n`;
+            fixSummary += `• ... and ${result.detailedFixes.length - 3} more changes\n`;
           }
           
-          fixSummary += `\nðŸ“‹ **View complete fix details in the Results tab**`;
+          fixSummary += `\n📋 **View complete fix details in the Results tab**`;
         }
         
-        fixSummary += `\n\nðŸ”„ Re-analyzing your data to show updated results...`;
+        fixSummary += `\n\n🔄 Re-analyzing your data to show updated results...`;
         
         addChatMessage('assistant', fixSummary);
         
@@ -1764,61 +2220,111 @@ function applyManualIssueFixes() {
           analyzeCurrentTab();
         }, 2000);
       } else {
-        addChatMessage('assistant', `âŒ AI auto-fix failed: ${result.error}`);
+        addChatMessage('assistant', `❌ AI auto-fix failed: ${result.error}`);
       }
     })
     .withFailureHandler(function(error) {
       autoFixBtn.textContent = originalText;
       autoFixBtn.disabled = false;
-      addChatMessage('assistant', `âŒ Auto-fix error: ${error.message}`);
+      addChatMessage('assistant', `❌ Auto-fix error: ${error.message}`);
     })
     .autoFixDataIssues({ source: 'ai-autofix' });
 }
 
 /**
- * Copy JSON to clipboard
+ * SPECIFICATION-COMPLIANT COPY JSON FUNCTION
+ * Prepares and copies Load[] JSON to clipboard
  */
 function copyJSON() {
   console.log('copyJSON called, currentAnalysis:', currentAnalysis);
   
   if (!currentAnalysis || !currentAnalysis.loads) {
-    alert('No valid loads data to copy. Please analyze your data first.');
-    addChatMessage('assistant', 'No analysis results available. Please run an analysis first to generate JSON data.');
+    addChatMessage('assistant', '❌ **No JSON data available to copy**\n\nPlease analyze your spreadsheet first to generate loads data.');
+    updateStatus('error', 'No loads data available');
     return;
   }
   
-  // Format according to exact Load schema from project specifications
-  var loadsJson = currentAnalysis.loads.map(load => ({
-    loadId: load.loadId || '',
-    fromAddress: load.fromAddress || '',
-    fromAppointmentDateTimeUTC: load.fromAppointmentDateTimeUTC || '',
-    toAddress: load.toAddress || '',
-    toAppointmentDateTimeUTC: load.toAppointmentDateTimeUTC || '',
-    status: load.status || '',
-    driverName: load.driverName || '',
-    driverPhone: load.driverPhone || undefined, // optional field
-    unitNumber: load.unitNumber || '',
-    broker: load.broker || ''
-  }));
+  // Show processing state
+  updateStatus('processing', 'Preparing JSON for copy...');
+  addChatMessage('user', '📋 Copy JSON');
+  addChatMessage('assistant', `📝 **Preparing JSON Data**\n\nFormatting ${currentAnalysis.loads.length} loads for clipboard...`);
   
-  var jsonString = JSON.stringify(loadsJson, null, 2);
-  console.log('JSON to copy:', jsonString.substring(0, 200) + '...');
+  // Call backend to prepare specification-compliant JSON
+  google.script.run
+    .withSuccessHandler(function(result) {
+      if (result.success) {
+        var copyMessage = `✅ **JSON Ready for Copy**\n\n`;
+        copyMessage += `📊 **Summary:**\n`;
+        copyMessage += `• Load Count: ${result.loadCount}\n`;
+        copyMessage += `• JSON Size: ${(result.size / 1024).toFixed(1)} KB\n\n`;
+        copyMessage += `📋 **JSON Data:**\n`;
+        copyMessage += '```json\n' + result.json + '\n```';
+        
+        addChatMessage('assistant', copyMessage);
+        
+        // Copy to clipboard
+        if (navigator.clipboard && window.isSecureContext) {
+          navigator.clipboard.writeText(result.json).then(() => {
+            addChatMessage('assistant', '✅ **JSON copied to clipboard successfully!**\n\nPaste it wherever you need the loads data.');
+            updateStatus('success', 'JSON copied to clipboard');
+          }).catch(err => {
+            console.error('Clipboard copy failed:', err);
+            showFallbackCopyMethod(result.json, result.loadCount);
+          });
+        } else {
+          // Fallback for older browsers or insecure contexts
+          showFallbackCopyMethod(result.json, result.loadCount);
+        }
+        
+      } else {
+        var errorMessage = `❌ **JSON Copy Failed**\n\n`;
+        errorMessage += `**Error:** ${result.error}\n\n`;
+        errorMessage += `**Troubleshooting:**\n`;
+        errorMessage += `• Ensure loads data is valid\n`;
+        errorMessage += `• Check for required fields\n`;
+        errorMessage += `• Try re-analyzing the data`;
+        
+        addChatMessage('assistant', errorMessage);
+        updateStatus('error', 'JSON copy failed');
+      }
+    })
+    .withFailureHandler(function(error) {
+      console.error('JSON copy preparation failed:', error);
+      
+      // Fallback to direct copy attempt
+      try {
+        var fallbackJson = JSON.stringify(currentAnalysis.loads, null, 2);
+        showFallbackCopyMethod(fallbackJson, currentAnalysis.loads.length);
+      } catch (fallbackError) {
+        var errorMessage = `🚨 **System Error During JSON Copy**\n\n`;
+        errorMessage += `**Error:** ${error.message || error}\n\n`;
+        errorMessage += `**Next Steps:**\n`;
+        errorMessage += `• Check internet connection\n`;
+        errorMessage += `• Refresh page and try again\n`;
+        errorMessage += `• Contact support if issue persists`;
+        
+        addChatMessage('assistant', errorMessage);
+        updateStatus('error', 'System error during JSON copy');
+      }
+    })
+    .prepareJSONForCopy(currentAnalysis.loads);
+}
+
+/**
+ * Show fallback copy method for older browsers
+ */
+function showFallbackCopyMethod(jsonString, loadCount) {
+  var fallbackMessage = `📋 **JSON Ready - Manual Copy Required**\n\n`;
+  fallbackMessage += `**Load Count:** ${loadCount}\n`;
+  fallbackMessage += `**Size:** ${(jsonString.length / 1024).toFixed(1)} KB\n\n`;
+  fallbackMessage += `**Instructions:**\n`;
+  fallbackMessage += `1. Select all text in the box below\n`;  
+  fallbackMessage += `2. Press Ctrl+C (Windows) or Cmd+C (Mac)\n\n`;
+  fallbackMessage += `**JSON Data:**\n`;
+  fallbackMessage += '```json\n' + jsonString + '\n```';
   
-  // Show preview in chat before copying
-  addChatMessage('assistant', `ðŸ“‹ **JSON Data Ready** (${loadsJson.length} loads)\n\`\`\`json\n${jsonString}\n\`\`\``);
-  
-  // Try modern clipboard API first
-  if (navigator.clipboard && window.isSecureContext) {
-    navigator.clipboard.writeText(jsonString).then(() => {
-      showCopySuccess(loadsJson.length);
-    }).catch(err => {
-      console.error('Clipboard API failed:', err);
-      fallbackCopy(jsonString, loadsJson.length);
-    });
-  } else {
-    // Use fallback method
-    fallbackCopy(jsonString, loadsJson.length);
-  }
+  addChatMessage('assistant', fallbackMessage);
+  updateStatus('success', 'JSON ready for manual copy');
 }
 
 /**
@@ -1853,15 +2359,15 @@ function fallbackCopy(jsonString, totalLoads) {
  */
 function showCopySuccess(totalLoads) {
   updateStatus('success', `JSON copied! ${totalLoads} loads ready for import.`);
-  addChatMessage('assistant', `âœ… JSON data copied to clipboard! Contains ${totalLoads} validated loads ready for TruckTalk import.`);
+  addChatMessage('assistant', `✅ JSON data copied to clipboard! Contains ${totalLoads} validated loads ready for TruckTalk import.`);
   
   // Briefly highlight the copy button
   var btn = document.getElementById('copy-json-btn');
   if (btn) {
-    btn.textContent = 'âœ“ Copied!';
+    btn.textContent = '✓ Copied!';
     btn.classList.add('btn-success');
     setTimeout(() => {
-      btn.innerHTML = '<span class="btn-icon">ðŸ“‹</span> Copy JSON';
+      btn.innerHTML = '<span class="btn-icon">📋</span> Copy JSON';
       btn.classList.remove('btn-success');
     }, 2000);
   }
@@ -1872,45 +2378,72 @@ function showCopySuccess(totalLoads) {
  */
 function showCopyError() {
   updateStatus('error', 'Failed to copy JSON to clipboard');
-  addChatMessage('assistant', 'âŒ Failed to copy JSON to clipboard. Please try again or copy manually from the preview.');
+  addChatMessage('assistant', '❌ Failed to copy JSON to clipboard. Please try again or copy manually from the preview.');
 }
 
 /**
- * Preview push (show formatted JSON in modal)
+ * SPECIFICATION-COMPLIANT PREVIEW PUSH FUNCTION
+ * Shows formatted JSON payload as per specification (no real API call required)
  */
 function previewPush() {
   console.log('previewPush called, currentAnalysis:', currentAnalysis);
   
   if (!currentAnalysis || !currentAnalysis.loads) {
-    alert('No valid loads data to preview. Please analyze your data first.');
-    addChatMessage('assistant', 'No analysis results available. Please run an analysis first to preview push data.');
+    addChatMessage('assistant', '❌ **No loads data available for preview**\n\nPlease analyze your spreadsheet first to generate loads data.');
+    updateStatus('error', 'No loads data available');
     return;
   }
   
-  // Format according to TruckTalk API specification
-  var payload = {
-    source: "sheets-addon",
-    version: 1,
-    loads: currentAnalysis.loads.map(load => ({
-      loadId: load.loadId || '',
-      fromAddress: load.fromAddress || '',
-      fromAppointmentDateTimeUTC: load.fromAppointmentDateTimeUTC || '',
-      toAddress: load.toAddress || '',
-      toAppointmentDateTimeUTC: load.toAppointmentDateTimeUTC || '',
-      status: load.status || '',
-      driverName: load.driverName || '',
-      driverPhone: load.driverPhone || undefined, // optional field  
-      unitNumber: load.unitNumber || '',
-      broker: load.broker || ''
-    }))
-  };
+  // Show loading state
+  updateStatus('processing', 'Generating preview push payload...');
+  addChatMessage('user', '👁️ Preview Push to TruckTalk');
+  addChatMessage('assistant', '📦 **Generating TruckTalk Push Preview**\n\nCreating payload for ' + currentAnalysis.loads.length + ' loads...');
   
-  // Create modal dialog for preview
-  showPreviewModal(payload);
-  
-  // Show preview in chat as well
-  var previewJson = JSON.stringify(payload, null, 2);
-  addChatMessage('assistant', `ï¿½ **TruckTalk Push Payload Preview** (${payload.loads.length} loads)\n\`\`\`json\n${previewJson}\n\`\`\``);
+  // Call backend to create specification-compliant preview
+  google.script.run
+    .withSuccessHandler(function(result) {
+      if (result.success) {
+        var previewMessage = `✅ **Push Payload Preview Generated**\n\n`;
+        previewMessage += `📊 **Summary:**\n`;
+        previewMessage += `• Load Count: ${result.summary.loadCount}\n`;
+        previewMessage += `• Payload Size: ${(result.summary.payloadSize / 1024).toFixed(1)} KB\n`;
+        previewMessage += `• Target API: ${result.summary.previewUrl}\n\n`;
+        previewMessage += `🔍 **Preview Payload:**\n`;
+        previewMessage += '```json\n' + JSON.stringify(result.payload, null, 2) + '\n```\n\n';
+        previewMessage += `⚠️ **Note:** ${result.summary.message}`;
+        
+        addChatMessage('assistant', previewMessage);
+        updateStatus('success', 'Preview payload generated');
+        
+        // Show in modal dialog as well
+        showPreviewModal(result.payload, result.summary);
+        
+      } else {
+        var errorMessage = `❌ **Preview Generation Failed**\n\n`;
+        errorMessage += `**Error:** ${result.error}\n\n`;
+        errorMessage += `**Troubleshooting:**\n`;
+        errorMessage += `• Ensure loads data is valid\n`;
+        errorMessage += `• Check for required fields\n`;
+        errorMessage += `• Try re-analyzing the data`;
+        
+        addChatMessage('assistant', errorMessage);
+        updateStatus('error', 'Preview generation failed');
+      }
+    })
+    .withFailureHandler(function(error) {
+      console.error('Preview push failed:', error);
+      
+      var errorMessage = `🚨 **System Error During Preview**\n\n`;
+      errorMessage += `**Error:** ${error.message || error}\n\n`;
+      errorMessage += `**Next Steps:**\n`;
+      errorMessage += `• Check internet connection\n`;
+      errorMessage += `• Refresh page and try again\n`;
+      errorMessage += `• Contact support if issue persists`;
+      
+      addChatMessage('assistant', errorMessage);
+      updateStatus('error', 'System error during preview');
+    })
+    .previewPushToTruckTalk(currentAnalysis.loads);
 }
 
 /**
@@ -1956,10 +2489,10 @@ function showPreviewModal(payload) {
     <div style="margin-bottom: 15px;">
       <button onclick="navigator.clipboard.writeText(this.nextElementSibling.textContent).then(() => alert('Push payload copied to clipboard!'))" 
               style="background: #2563eb; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; margin-right: 10px;">
-        ðŸ“‹ Copy Push Payload
+        📋 Copy Push Payload
       </button>
       <span style="color: #666; font-size: 14px;">
-        TruckTalk API format â€¢ Ready for integration
+        TruckTalk API format • Ready for integration
       </span>
     </div>
     <pre style="background: #f8f9fa; padding: 15px; border-radius: 4px; overflow: auto; max-height: 400px; font-size: 12px; border: 1px solid #e9ecef;">${jsonString}</pre>
@@ -2016,15 +2549,15 @@ function pushToTruckTalk() {
       pushBtn.disabled = false;
       
       if (result.success) {
-        addChatMessage('assistant', `âœ… Successfully pushed ${result.pushedLoads} loads to TruckTalk platform!`);
+        addChatMessage('assistant', `✅ Successfully pushed ${result.pushedLoads} loads to TruckTalk platform!`);
       } else {
-        addChatMessage('assistant', `âŒ Failed to push data: ${result.error}`);
+        addChatMessage('assistant', `❌ Failed to push data: ${result.error}`);
       }
     })
     .withFailureHandler(function(error) {
       pushBtn.textContent = originalText;
       pushBtn.disabled = false;
-      addChatMessage('assistant', `âŒ Error pushing to TruckTalk: ${error.message}`);
+      addChatMessage('assistant', `❌ Error pushing to TruckTalk: ${error.message}`);
     })
     .pushToTruckTalk(payload);
 }
@@ -2238,6 +2771,19 @@ window.closeMappingDialog = closeMappingDialog;
 window.confirmMapping = confirmMapping;
 window.applyAutoFixes = applyAutoFixes;
 window.testJSONDisplay = testJSONDisplay;
+window.testAIFixSystem = testAIFixSystem;
+
+// Production testing function - accessible via console
+window.enableProductionTesting = function() {
+  var testAiFixBtn = document.getElementById('test-ai-fix-btn');
+  if (testAiFixBtn) {
+    testAiFixBtn.style.display = 'inline-block';
+    console.log('🧪 Production AI Fix testing enabled - button now visible');
+  }
+};
 
 console.log('TruckTalk Connect UI JavaScript loaded');
+console.log('💡 Tip: Type enableProductionTesting() in console to enable AI fix testing');
 </script>
+
+

@@ -76,6 +76,16 @@
                         <span class="btn-icon"></span>
                         Re-analyze
                     </button>
+                    
+                    <!-- Debug button for testing JSON display -->
+                    <button id="test-json-btn" class="btn btn-outline" onclick="forceDisplayJSON()" style="display: none; font-size: 11px; padding: 4px 8px;">
+                         Test JSON
+                    </button>
+                    
+                    <!-- Production AI Fix Test Button -->
+                    <button id="test-ai-fix-btn" class="btn btn-outline" onclick="testAIFixSystem()" style="display: none; font-size: 11px; padding: 4px 8px; background: #f59e0b; color: white;">
+                        Test AI Fix
+                    </button>
                 </div>
             </div>
         </div>
@@ -123,16 +133,9 @@
                             <div id="warning-issues-list" class="issues-list"></div>
                         </div>
                         
-                        <!-- AI Auto-Fix Section -->
-                        <div id="ai-autofix-section" class="ai-autofix-section" style="display: none;">
-                            <h4> AI Auto-Fix</h4>
-                            <p>Let AI automatically fix common errors in your data:</p>
-                            <div class="autofix-buttons">
-                                <button id="ai-autofix-btn" class="btn btn-success" onclick="startAIAutoFix()">
-                                     Fix Errors with AI
-                                </button>
-                                <span class="autofix-note">AI will suggest fixes for missing data, duplicates, and format issues</span>
-                            </div>
+                        <!-- AI Auto-Fix Section - Now handled dynamically -->
+                        <div id="ai-autofix-section" class="ai-autofix-section" style="display: none !important;">
+                            <!-- This section is now handled dynamically by displayAIAnalysisSection() -->
                         </div>
 
                         <!-- Fix Hints -->

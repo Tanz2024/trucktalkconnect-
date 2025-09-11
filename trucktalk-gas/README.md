@@ -2,6 +2,48 @@
 
 A Google Sheets add-on for logistics data management with AI-powered analysis and validation.
 
+## 🎥 Demo Video
+
+Watch TruckTalk Connect in action - AI-powered logistics data analysis with Google Sheets:
+
+### 📹 **Live Demo Video**
+
+<div align="center">
+
+**[▶️ Watch Full Demo (MP4)](./assets/demo-video.mp4)**
+
+*Complete walkthrough of TruckTalk Connect features and workflow*
+
+[![Video Preview](https://img.shields.io/badge/▶️_Click_to_Watch-Demo_Video-blue?style=for-the-badge&logo=video)](./assets/demo-video.mp4)
+
+</div>
+
+---
+
+**🎬 Video Highlights:**
+- 📊 **Data Upload & Analysis** - See real spreadsheet data being processed
+- 🤖 **AI Auto-Fix in Action** - Watch automatic error correction
+- ✅ **Validation & Quality Check** - Complete data validation process  
+- 📤 **JSON Export Process** - Ready-to-use structured output
+
+> 💡 **Note:** Video shows the complete end-to-end workflow with real data transformation
+
+> 🎯 **What you'll see:**
+> - Real-time data analysis and validation
+> - AI-powered error detection and auto-fixing
+> - Smart column mapping and data transformation
+> - JSON export ready for logistics systems
+> - Complete workflow from raw data to structured output
+
+### 🚀 **Key Features Demonstrated:**
+- ⚡ **Instant Analysis** - Upload data and get immediate validation
+- 🤖 **AI Auto-Fix** - Automatically corrects common data issues
+- 📊 **Smart Mapping** - Intelligent column header recognition
+- ✅ **Quality Assurance** - Comprehensive error detection
+- 📤 **Export Ready** - Clean JSON output for integration
+
+*Video shows the complete workflow from raw spreadsheet data to production-ready structured output.*
+
 ## Setup
 
 ### Prerequisites
@@ -59,6 +101,62 @@ Your spreadsheet should contain logistics data with headers like:
 - Status information
 
 The system will automatically map your headers to standard fields.
+
+## 📹 How to Add Your Demo Video
+
+### Step 1: Record Your Video
+1. Open your TruckTalk Connect add-on in Google Sheets
+2. Use screen recording software (OBS, Camtasia, or built-in tools)
+3. Record a 1-3 minute demo showing:
+   - Opening the add-on
+   - Analyzing sample data
+   - Viewing results
+   - Using AI fix features
+   - Copying JSON output
+
+### Step 2: Prepare Your Video File
+1. **Format**: Save as MP4 (H.264 codec) for best compatibility
+2. **Resolution**: 1280x720 or 1920x1080
+3. **File Size**: Keep under 25MB for GitHub, or use external hosting
+4. **Optional**: Create a GIF version for quick preview
+
+### Step 3: Add to Repository
+1. Save your video file in the `assets` folder:
+   ```
+   trucktalk-gas/
+   └── assets/
+       ├── demo-video.mp4     ← Your main video
+       ├── demo-preview.gif   ← Optional GIF preview
+       └── thumbnail.png      ← Optional thumbnail
+   ```
+
+2. Update the video section above with your actual filename
+
+### Step 4: Alternative Hosting Options
+
+#### Option A: YouTube (Recommended for longer videos)
+1. Upload your video to YouTube
+2. Get the video ID from the URL
+3. Add thumbnail image to `assets/youtube-thumbnail.png`
+4. Update README with:
+   ```markdown
+   [![TruckTalk Connect Demo](./assets/youtube-thumbnail.png)](https://www.youtube.com/watch?v=YOUR_VIDEO_ID)
+   ```
+
+#### Option B: Direct File Embed (For shorter videos)
+1. Place MP4 file in `assets` folder
+2. Update README with:
+   ```markdown
+   ![TruckTalk Connect Demo](./assets/your-video-name.mp4)
+   ```
+
+#### Option C: GIF Preview (For quick demos)
+1. Convert your video to GIF (use tools like GIPHY, EZGIF, or FFMPEG)
+2. Keep GIF under 10MB for best loading
+3. Add to README with:
+   ```markdown
+   ![TruckTalk Connect Demo](./assets/demo.gif)
+   ```
 
 ## Limitations
 

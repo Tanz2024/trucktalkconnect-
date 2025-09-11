@@ -78,7 +78,10 @@ These permissions are automatically requested when users first install the add-o
 
 See TruckTalk Connect in action with our comprehensive demo:
 
-https://github.com/Tanz2024/trucktalkconnect-/raw/master/trucktalk-gas/assets/demo-video.mp4
+<video width="800" controls>
+  <source src="https://github.com/Tanz2024/trucktalkconnect-/raw/master/trucktalk-gas/assets/demo-video.mp4" type="video/mp4">
+  Your browser does not support the video tag. <a href="https://github.com/Tanz2024/trucktalkconnect-/raw/master/trucktalk-gas/assets/demo-video.mp4">Download the video</a>
+</video>
 
 **What the demo covers:**
 - Opening TruckTalk Connect in Google Sheets

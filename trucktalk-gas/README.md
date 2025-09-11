@@ -10,15 +10,11 @@ Watch TruckTalk Connect in action - AI-powered logistics data analysis with Goog
 
 <div align="center">
 
-> **🎬 Demo Video Available Locally**  
-> Due to GitHub's file size limits, the demo video is available in your local `assets/demo-video.mp4`
+**[▶️ Watch Demo Video](./assets/demo-video.mp4)**
 
-**Alternative Options:**
-- **📤 Upload to YouTube/Vimeo** for public sharing
-- **🔗 Use GitHub Releases** to attach large files
-- **☁️ Cloud Storage** link (Google Drive, Dropbox)
+*Click above to download and watch the full demonstration*
 
-[![Video Coming Soon](https://img.shields.io/badge/📹_Demo_Video-Coming_Soon-orange?style=for-the-badge&logo=video)](./assets/)
+[![Download Demo](https://img.shields.io/badge/📹_Download_Demo-MP4_Video-blue?style=for-the-badge&logo=video)](./assets/demo-video.mp4)
 
 </div>
 
@@ -30,7 +26,33 @@ Watch TruckTalk Connect in action - AI-powered logistics data analysis with Goog
 - ✅ **Validation & Quality Check** - Complete data validation process  
 - 📤 **JSON Export Process** - Ready-to-use structured output
 
-> 💡 **For Developers:** The demo video (`demo-video.mp4`) is available locally in the `assets/` folder. To share publicly, consider uploading to YouTube or using Git LFS for large files.
+---
+
+## � **Project Assets & Media**
+
+### 🎥 **Video Files**
+- `assets/demo-video.mp4` - Complete demonstration (118MB)
+- `assets/demo.gif` - Quick preview animation *(coming soon)*
+- `assets/thumbnail.png` - Video thumbnail image *(coming soon)*
+
+### 📸 **Screenshots** *(coming soon)*
+- `assets/screenshot-analysis.png` - Analysis results view
+- `assets/screenshot-ui.png` - Main interface overview
+- `assets/screenshot-ai-fix.png` - AI auto-fix in action
+
+### 📐 **Video Specifications**
+- **Format:** MP4 (H.264 codec)
+- **Resolution:** 1920x1080 (1080p)
+- **Duration:** ~2 minutes
+- **Content:** Complete workflow demonstration
+
+### 🔗 **Alternative Video Access**
+If the video doesn't play directly in GitHub:
+1. **Download locally:** Click the video link above
+2. **YouTube version:** *Upload pending*
+3. **GIF preview:** *Coming soon for quick viewing*
+
+> 💡 **Note:** GitHub has limitations with large video files. For best viewing experience, download the video locally or we can create a shorter GIF version.
 
 > 🎯 **What you'll see:**
 > - Real-time data analysis and validation

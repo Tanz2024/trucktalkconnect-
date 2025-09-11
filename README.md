@@ -74,6 +74,23 @@ The add-on requires these Google permissions:
 
 These permissions are automatically requested when users first install the add-on.
 
+## Demo Video
+
+See TruckTalk Connect in action with our comprehensive demo:
+
+https://github.com/Tanz2024/trucktalkconnect-/raw/master/trucktalk-gas/assets/demo-video.mp4
+
+**What the demo covers:**
+- Opening TruckTalk Connect in Google Sheets
+- Analyzing logistics data with AI
+- Reviewing validation results and suggestions
+- Using the Auto-Fix system to resolve data issues
+- Exporting standardized data for integration
+
+**Alternative viewing options:**
+- [Download video directly](https://github.com/Tanz2024/trucktalkconnect-/raw/master/trucktalk-gas/assets/demo-video.mp4)
+- [View in GitHub repository](https://github.com/Tanz2024/trucktalkconnect-/blob/master/trucktalk-gas/assets/demo-video.mp4)
+
 ##  Latest Enhancements
 
 ### Smart Auto-Fix System
